@@ -2,22 +2,21 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>OKOин — полная версия</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OKOин — с отладкой</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
-        .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(4px); border-radius: 28px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .card { background: rgba(255,255,255,0.95); border-radius: 28px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
         .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
-        .employee-card, .prize-card, .achievement-item { background: white; border-radius: 20px; padding: 14px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .employee-card, .prize-card, .achievement-item { background: white; border-radius: 20px; padding: 14px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
         .prize-card { cursor: pointer; transition: 0.2s; }
-        .prize-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .btn { padding: 8px 18px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; font-family: inherit; transition: 0.2s; }
+        .prize-card:hover { transform: translateY(-2px); }
+        .btn { padding: 8px 18px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; }
         .btn-primary { background: #2d6a4f; color: white; }
-        .btn-primary:hover { background: #1f543f; }
         .btn-secondary { background: #e2e8f0; color: #1e293b; }
         .btn-warning { background: #f97316; color: white; }
         .btn-danger { background: #dc2626; color: white; }
@@ -26,13 +25,9 @@
         .level-silver { background: #94a3b8; color: white; }
         .level-gold { background: #fbbf24; color: #1e293b; }
         .level-platinum { background: #c084fc; color: white; }
-        input, textarea { padding: 8px 16px; border-radius: 40px; border: 1px solid #cbd5e1; font-family: inherit; background: white; }
+        input, textarea { padding: 8px 16px; border-radius: 40px; border: 1px solid #cbd5e1; background: white; }
         .avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .stat-card { background: rgba(255,255,255,0.7); border-radius: 24px; padding: 16px; text-align: center; }
-        .notification { position: fixed; bottom: 20px; right: 20px; background: white; padding: 12px 24px; border-radius: 60px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; animation: fadeIn 0.2s; max-width: 300px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; } }
-        @media (max-width: 700px) { body { padding: 12px; } .card { padding: 16px; } }
+        .notification { position: fixed; bottom: 20px; right: 20px; background: white; padding: 12px 24px; border-radius: 60px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
         .tab { display: none; }
         .tab.active { display: block; }
         .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 12px; }
@@ -40,125 +35,194 @@
         .tab-btn.active { background: #2d6a4f; color: white; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 2000; }
         .modal-content { background: white; border-radius: 28px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
-        .close-modal { background: none; border: none; font-size: 28px; cursor: pointer; float: right; }
+        .close-modal { float: right; font-size: 28px; cursor: pointer; background: none; border: none; }
     </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
-// ==================== КОНФИГУРАЦИЯ SUPABASE ====================
+// ==================== КОНФИГУРАЦИЯ ====================
 const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
 
 let currentUser = null;
 let activeTab = 'main';
+let employees = [];
+let prizes = [];
+let userHistory = [];
+let achievements = [];
 
-// ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-function showToast(msg) {
+function showToast(msg, isError = false) {
     const toast = document.createElement('div');
     toast.className = 'notification';
     toast.innerText = msg;
+    if (isError) toast.style.background = '#fee2e2';
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
 }
+
 function getLevel(rating) {
     if (rating >= 500) return { name: 'Платина', emoji: '💎', color: 'platinum' };
     if (rating >= 300) return { name: 'Золото', emoji: '🥇', color: 'gold' };
     if (rating >= 100) return { name: 'Серебро', emoji: '🥈', color: 'silver' };
     return { name: 'Бронза', emoji: '🥉', color: 'bronze' };
 }
-function getLevelBadge(rating) { const l = getLevel(rating); return `<span class="level-badge level-${l.color}">${l.emoji} ${l.name}</span>`; }
+function getLevelBadge(rating) {
+    const l = getLevel(rating);
+    return `<span class="level-badge level-${l.color}">${l.emoji} ${l.name}</span>`;
+}
 
-// ==================== ЗАПРОСЫ К SUPABASE (REST) ====================
-async function supabaseFetch(table, method, filters = {}, body = null, id = null) {
-    let url = `${SUPABASE_URL}/rest/v1/${table}`;
-    if (method === 'GET') {
-        const params = new URLSearchParams();
-        for (const [key, val] of Object.entries(filters)) params.append(key, `eq.${encodeURIComponent(val)}`);
-        if (params.toString()) url += `?${params.toString()}`;
-        const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-        return await res.json();
-    }
-    if (method === 'POST') {
+// ==================== API ====================
+async function apiFetch(url, options = {}) {
+    try {
         const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            ...options,
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                ...options.headers
+            }
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         return await res.json();
+    } catch(e) {
+        console.error('API Error:', e);
+        showToast(`Ошибка: ${e.message}`, true);
+        return null;
     }
-    if (method === 'PATCH') {
-        if (!id) throw new Error('id required');
-        const res = await fetch(`${url}?id=eq.${id}`, {
-            method: 'PATCH',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        return await res.json();
-    }
-    if (method === 'DELETE') {
-        if (!id) throw new Error('id required');
-        await fetch(`${url}?id=eq.${id}`, { method: 'DELETE', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-        return { success: true };
+}
+
+// ==================== ЗАГРУЗКА ДАННЫХ ====================
+async function loadAllData() {
+    if (!currentUser) return;
+    try {
+        const [empData, prizeData, histData, achData] = await Promise.all([
+            apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee&status=eq.active`),
+            apiFetch(`${SUPABASE_URL}/rest/v1/prizes`),
+            apiFetch(`${SUPABASE_URL}/rest/v1/history?user_id=eq.${currentUser.id}`),
+            apiFetch(`${SUPABASE_URL}/rest/v1/achievements?user_id=eq.${currentUser.id}`)
+        ]);
+        if (empData) employees = empData;
+        if (prizeData) prizes = prizeData;
+        if (histData) userHistory = histData.sort((a,b) => new Date(b.date) - new Date(a.date));
+        if (achData) achievements = achData.sort((a,b) => new Date(b.date) - new Date(a.date));
+        console.log('Загружено сотрудников:', employees.length);
+        console.log('Загружено призов:', prizes.length);
+    } catch(e) {
+        showToast('Ошибка загрузки данных', true);
     }
 }
 
 // ==================== АУТЕНТИФИКАЦИЯ ====================
 async function doLogin(login, password) {
     try {
-        const url = `${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(password)}`;
-        const res = await fetch(url, { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } });
-        const data = await res.json();
+        const data = await apiFetch(`${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(password)}`);
         if (data && data.length) {
             currentUser = data[0];
             if (currentUser.status === 'archived') { alert('Аккаунт архивирован'); return; }
+            await loadAllData();
             showToast(`Добро пожаловать, ${currentUser.name}`);
             renderApp();
-        } else alert('Неверный логин или пароль');
-    } catch(e) { alert('Ошибка связи'); }
+        } else {
+            alert('Неверный логин или пароль');
+        }
+    } catch(e) {
+        alert('Ошибка связи');
+    }
 }
 function doLogout() { currentUser = null; renderApp(); }
 
-// ==================== ОПЕРАЦИИ С БАЛЛАМИ ====================
+// ==================== БАЛЛЫ ====================
 async function updatePoints(empId, delta) {
-    let reason = prompt('Укажите причину:', delta > 0 ? 'Бонус' : 'Замечание');
+    let reason = prompt('Причина:', delta > 0 ? 'Бонус' : 'Замечание');
     if (!reason) return;
-    const users = await supabaseFetch('users', 'GET', { id: empId });
-    if (!users.length) return;
-    const user = users[0];
-    const newPoints = user.points + delta;
-    const newRating = delta > 0 ? user.rating + delta : user.rating;
-    await supabaseFetch('users', 'PATCH', {}, { points: newPoints, rating: newRating }, empId);
-    await supabaseFetch('history', 'POST', {}, { user_id: empId, reason, delta });
-    if (currentUser.id === empId) { currentUser.points = newPoints; currentUser.rating = newRating; }
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    const newPoints = emp.points + delta;
+    const newRating = delta > 0 ? emp.rating + delta : emp.rating;
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: newPoints, rating: newRating })
+    });
+    if (result === null) return;
+    await apiFetch(`${SUPABASE_URL}/rest/v1/history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: empId, reason, delta })
+    });
+    emp.points = newPoints;
+    emp.rating = newRating;
+    if (currentUser.id === empId) {
+        currentUser.points = newPoints;
+        currentUser.rating = newRating;
+    }
+    if (currentUser.id === empId) {
+        userHistory.unshift({ date: new Date().toISOString(), reason, delta });
+    }
     showToast(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} OKO`);
     renderApp();
 }
 
-// ==================== УПРАВЛЕНИЕ СОТРУДНИКАМИ ====================
+// ==================== СОТРУДНИКИ ====================
 async function addUser(name, surname, login, password, points) {
-    const existing = await supabaseFetch('users', 'GET', { login });
-    if (existing.length) { alert('Логин занят'); return; }
-    await supabaseFetch('users', 'POST', {}, { name, surname, login, password, role: 'employee', points: parseInt(points), rating: parseInt(points), photo: '', email: '', status: 'active' });
-    showToast('Сотрудник добавлен');
+    if (employees.find(e => e.login === login)) { alert('Логин занят'); return; }
+    const newUser = {
+        name, surname, login, password, role: 'employee',
+        points: parseInt(points), rating: parseInt(points), photo: '', email: '', status: 'active'
+    };
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+    });
+    if (result === null) { showToast('Ошибка добавления сотрудника', true); return; }
+    // Перезагружаем список сотрудников
+    const fresh = await apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee&status=eq.active`);
+    if (fresh) employees = fresh;
+    showToast(`Сотрудник ${name} добавлен`);
     renderApp();
 }
 async function archiveUser(id) {
-    const users = await supabaseFetch('users', 'GET', { id });
-    if (!users.length) return;
-    const newStatus = users[0].status === 'archived' ? 'active' : 'archived';
-    await supabaseFetch('users', 'PATCH', {}, { status: newStatus }, id);
-    showToast('Статус изменён');
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    const newStatus = emp.status === 'archived' ? 'active' : 'archived';
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+    });
+    if (result === null) return;
+    if (newStatus === 'active') {
+        const fresh = await apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee&status=eq.active`);
+        if (fresh) employees = fresh;
+    } else {
+        employees = employees.filter(e => e.id !== id);
+    }
     renderApp();
 }
 async function updateUserEmail(id, email) {
-    await supabaseFetch('users', 'PATCH', {}, { email }, id);
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+    });
+    if (result === null) return;
+    const emp = employees.find(e => e.id === id);
+    if (emp) emp.email = email;
     if (currentUser.id === id) currentUser.email = email;
     showToast('Email обновлён');
     renderApp();
 }
 async function updateUserPoints(id, newPoints) {
-    await supabaseFetch('users', 'PATCH', {}, { points: newPoints, rating: newPoints }, id);
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: newPoints, rating: newPoints })
+    });
+    if (result === null) return;
+    const emp = employees.find(e => e.id === id);
+    if (emp) { emp.points = newPoints; emp.rating = newPoints; }
     if (currentUser.id === id) { currentUser.points = newPoints; currentUser.rating = newPoints; }
     showToast('Баланс обновлён');
     renderApp();
@@ -169,57 +233,100 @@ async function changeUserPassword(oldPwd, newPwd) {
         alert('Пароль: мин 8, заглавная, цифра, спецсимвол');
         return false;
     }
-    await supabaseFetch('users', 'PATCH', {}, { password: newPwd }, currentUser.id);
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${currentUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPwd })
+    });
+    if (result === null) return false;
     currentUser.password = newPwd;
     alert('Пароль изменён');
     return true;
 }
 async function updateUserPhoto(userId, dataUrl) {
-    await supabaseFetch('users', 'PATCH', {}, { photo: dataUrl }, userId);
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo: dataUrl })
+    });
+    if (result === null) return;
     if (currentUser.id === userId) currentUser.photo = dataUrl;
+    const emp = employees.find(e => e.id === userId);
+    if (emp) emp.photo = dataUrl;
     showToast('Фото обновлено');
     renderApp();
 }
 
 // ==================== ДОСТИЖЕНИЯ ====================
-async function getAchievements(userId) { return await supabaseFetch('achievements', 'GET', { user_id: userId }); }
 async function addAchievement(userId, text) {
-    await supabaseFetch('achievements', 'POST', {}, { user_id: userId, text });
-    showToast('Достижение добавлено');
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, text })
+    });
+    if (result === null) return;
+    const fresh = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?user_id=eq.${userId}`);
+    if (fresh) achievements = fresh.sort((a,b) => new Date(b.date) - new Date(a.date));
     renderApp();
+    showToast('Достижение добавлено');
 }
 async function deleteAchievement(id) {
-    await supabaseFetch('achievements', 'DELETE', {}, {}, id);
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
+    if (result === null) return;
+    achievements = achievements.filter(a => a.id !== id);
     renderApp();
 }
 async function editAchievement(id, newText) {
-    await supabaseFetch('achievements', 'PATCH', {}, { text: newText }, id);
-    showToast('Достижение обновлено');
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newText })
+    });
+    if (result === null) return;
+    const ach = achievements.find(a => a.id === id);
+    if (ach) ach.text = newText;
     renderApp();
+    showToast('Достижение обновлено');
 }
 
 // ==================== ПРИЗЫ ====================
-async function loadPrizes() { return await supabaseFetch('prizes', 'GET'); }
 async function addPrize(name, cost, desc, conditions, imageUrl) {
-    await supabaseFetch('prizes', 'POST', {}, { name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl });
-    showToast(`Приз "${name}" добавлен`);
+    const newPrize = { name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl };
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPrize)
+    });
+    if (result === null) return;
+    const fresh = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`);
+    if (fresh) prizes = fresh;
     renderApp();
+    showToast(`Приз "${name}" добавлен`);
 }
 async function editPrize(id, name, cost, desc, conditions, imageUrl) {
-    await supabaseFetch('prizes', 'PATCH', {}, { name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl }, id);
-    showToast('Приз изменён');
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl })
+    });
+    if (result === null) return;
+    const fresh = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`);
+    if (fresh) prizes = fresh;
     renderApp();
+    showToast('Приз изменён');
 }
 async function deletePrize(id) {
-    await supabaseFetch('prizes', 'DELETE', {}, {}, id);
-    showToast('Приз удалён');
+    const result = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
+    if (result === null) return;
+    prizes = prizes.filter(p => p.id !== id);
     renderApp();
+    showToast('Приз удалён');
 }
 function showPrizeModal(prize) {
     const modal = document.getElementById('prizeModal');
     const content = document.getElementById('modalContent');
     content.innerHTML = `
-        <div><span class="close-modal" style="float:right;">&times;</span><h2>${prize.name}</h2></div>
+        <div><button class="close-modal">&times;</button><h2>${prize.name}</h2></div>
         <div><strong>📖 Описание:</strong> ${prize.description}</div>
         <div><strong>💰 Стоимость:</strong> ${prize.cost} OKO</div>
         <div><strong>📌 Условия:</strong> ${prize.conditions || 'Нет'}</div>
@@ -230,19 +337,24 @@ function showPrizeModal(prize) {
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 }
 
-// ==================== ЗАГРУЗКА ДАННЫХ ДЛЯ ИНТЕРФЕЙСА ====================
-async function loadEmployees() { return await supabaseFetch('users', 'GET', { role: 'employee', status: 'active' }); }
-async function loadHistory(userId = null) {
-    let filter = userId ? { user_id: userId } : {};
-    let data = await supabaseFetch('history', 'GET', filter);
-    data.sort((a,b) => new Date(b.date) - new Date(a.date));
-    return data;
+async function exportData() {
+    const allUsers = await apiFetch(`${SUPABASE_URL}/rest/v1/users`);
+    const allPrizes = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`);
+    const allHistory = await apiFetch(`${SUPABASE_URL}/rest/v1/history`);
+    if (!allUsers || !allPrizes || !allHistory) { showToast('Ошибка экспорта', true); return; }
+    const data = { users: allUsers, prizes: allPrizes, history: allHistory, exportDate: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `oko_backup_${new Date().toISOString().slice(0,19)}.json`;
+    a.click();
+    showToast('Данные сохранены');
 }
 
-// ==================== ОТРИСОВКА ИНТЕРФЕЙСА ====================
+// ==================== ОТРИСОВКА ====================
 function setActiveTab(tab) { activeTab = tab; renderApp(); }
 
-async function renderApp() {
+function renderApp() {
     if (!currentUser) {
         document.getElementById('app').innerHTML = `
             <div style="max-width:400px; margin:50px auto;">
@@ -251,7 +363,6 @@ async function renderApp() {
                     <input type="text" id="loginLogin" placeholder="Логин" style="width:100%; margin-bottom:12px;">
                     <input type="password" id="loginPass" placeholder="Пароль" style="width:100%; margin-bottom:12px;" onkeypress="if(event.key==='Enter') doLogin(document.getElementById('loginLogin').value, document.getElementById('loginPass').value)">
                     <button class="btn btn-primary" style="width:100%;" onclick="doLogin(document.getElementById('loginLogin').value, document.getElementById('loginPass').value)">Войти</button>
-                    <div id="loginError" style="color:red; margin-top:12px;"></div>
                 </div>
             </div>
         `;
@@ -259,72 +370,67 @@ async function renderApp() {
     }
 
     const isManager = currentUser.role === 'manager';
-    const employees = await loadEmployees();
-    const prizes = await loadPrizes();
-    const userHistory = await loadHistory(currentUser.id);
-    const achievements = await getAchievements(currentUser.id);
-
     const html = `
         <div class="container">
             <div class="card flex">
-                <h1 style="background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent;">🏆 OKOин</h1>
+                <h1>🏆 OKOин</h1>
                 <div class="flex">
                     <div style="display:flex; align-items:center; gap:12px;">
-                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar">` : `<div class="avatar" style="background:#cbd5e1; display:flex; align-items:center; justify-content:center;">👤</div>`}
+                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar">` : `<div class="avatar">👤</div>`}
                         <div><strong>${currentUser.name}</strong> ⭐ ${currentUser.rating}<br>${getLevelBadge(currentUser.rating)}</div>
                     </div>
                     <button class="btn btn-secondary" id="logoutBtn">Выйти</button>
-                    ${!isManager ? `<button class="btn btn-secondary" id="changePwdBtn">🔑 Сменить пароль</button>` : ''}
+                    ${!isManager ? `<button class="btn btn-secondary" id="changePwdBtn">Сменить пароль</button>` : ''}
                 </div>
             </div>
             <div class="tab-buttons">
-                <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">🏠 Главная</button>
-                ${isManager ? `<button class="tab-btn ${activeTab === 'users' ? 'active' : ''}" data-tab="users">👥 Управление</button>` : ''}
-                ${isManager ? `<button class="tab-btn ${activeTab === 'prizes-admin' ? 'active' : ''}" data-tab="prizes-admin">🎁 Управление призами</button>` : ''}
-                ${!isManager ? `<button class="tab-btn ${activeTab === 'achievements' ? 'active' : ''}" data-tab="achievements">🌟 Достижения</button>` : ''}
-                ${!isManager ? `<button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" data-tab="history">📜 История</button>` : ''}
-                <button class="tab-btn ${activeTab === 'profile' ? 'active' : ''}" data-tab="profile">👤 Профиль</button>
+                <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">Главная</button>
+                ${isManager ? `<button class="tab-btn ${activeTab === 'users' ? 'active' : ''}" data-tab="users">Управление сотрудниками</button>` : ''}
+                ${isManager ? `<button class="tab-btn ${activeTab === 'prizes-admin' ? 'active' : ''}" data-tab="prizes-admin">Управление призами</button>` : ''}
+                ${!isManager ? `<button class="tab-btn ${activeTab === 'achievements' ? 'active' : ''}" data-tab="achievements">Достижения</button>` : ''}
+                ${!isManager ? `<button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" data-tab="history">История</button>` : ''}
+                <button class="tab-btn ${activeTab === 'profile' ? 'active' : ''}" data-tab="profile">Профиль</button>
             </div>
-            <!-- ГЛАВНАЯ -->
+            <!-- Главная -->
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="grid-2">
                     <div class="card">
                         <h3>👥 Команда</h3>
-                        ${employees.map(emp => `
+                        ${employees.length === 0 ? '<p>Нет активных сотрудников</p>' : employees.map(emp => `
                             <div class="employee-card">
-                                <div style="display:flex; align-items:center; gap:12px;">
-                                    <div>${emp.photo ? `<img src="${emp.photo}" style="width:40px;height:40px;border-radius:50%;">` : '<div style="width:40px;height:40px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;">👤</div>'}</div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    ${emp.photo ? `<img src="${emp.photo}" style="width:40px;height:40px;border-radius:50%;">` : '👤'}
                                     <div><strong>${emp.name}</strong> ${getLevelBadge(emp.rating)}<br>💰 ${emp.points} OKO</div>
                                 </div>
                                 ${isManager ? `
                                     <div>
                                         <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 5)">+5</button>
                                         <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 10)">+10</button>
-                                        <button class="btn btn-warning" onclick="let a=prompt('Сумма списания'); if(a) updatePoints(${emp.id}, -parseInt(a))">-</button>
+                                        <button class="btn btn-warning" onclick="let a=prompt('Сумма списания:'); if(a && !isNaN(a)) updatePoints(${emp.id}, -parseInt(a))">-</button>
                                     </div>
                                 ` : ''}
                             </div>
                         `).join('')}
-                        ${isManager ? `<div style="margin-top:16px;"><button class="btn btn-primary" id="addUserBtn">➕ Добавить сотрудника</button></div>` : ''}
+                        ${isManager ? `<div><button class="btn btn-primary" id="addUserBtn">➕ Добавить сотрудника</button></div>` : ''}
                     </div>
                     <div class="card">
                         <h3>🎁 Призы</h3>
-                        ${prizes.map(p => `<div class="prize-card" onclick="showPrizeModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br>${p.description}</div><div><span class="level-badge level-gold">${p.cost} OKO</span></div></div>`).join('')}
-                        ${!isManager ? `<div style="margin-top:16px; background:#d1fae5; padding:12px; border-radius:20px;">🎯 Доступно: ${prizes.filter(p => p.cost <= currentUser.points).length} призов</div>` : ''}
+                        ${prizes.length === 0 ? '<p>Нет призов</p>' : prizes.map(p => `<div class="prize-card" onclick="showPrizeModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br>${p.description}</div><div>${p.cost} OKO</div></div>`).join('')}
+                        ${!isManager ? `<div style="margin-top:12px; background:#d1fae5; padding:8px; border-radius:20px;">🎯 Доступно: ${prizes.filter(p => p.cost <= currentUser.points).length} призов</div>` : ''}
                     </div>
                 </div>
             </div>
             ${isManager ? `
             <div id="tab-users" class="tab ${activeTab === 'users' ? 'active' : ''}">
                 <div class="card">
-                    <h3>📋 Управление сотрудниками</h3>
+                    <h3>Управление сотрудниками</h3>
                     ${employees.map(u => `
                         <div class="employee-card">
                             <div><strong>${u.name}</strong> (${u.login})<br>💰 ${u.points} OKO | ⭐ ${u.rating}<br>📧 ${u.email || '-'}</div>
-                            <div class="flex">
-                                <button class="btn btn-secondary" onclick="updateUserPoints(${u.id}, parseInt(prompt('Новый баланс:', ${u.points})))">✏️ Баланс</button>
-                                <button class="btn btn-secondary" onclick="updateUserEmail(${u.id}, prompt('Новый email:'))">✉️ Email</button>
-                                <button class="btn btn-danger" onclick="archiveUser(${u.id})">${u.status === 'archived' ? 'Восстановить' : 'Архив'}</button>
+                            <div>
+                                <button class="btn btn-secondary" onclick="updateUserPoints(${u.id}, parseInt(prompt('Новый баланс:', ${u.points})))">Баланс</button>
+                                <button class="btn btn-secondary" onclick="updateUserEmail(${u.id}, prompt('Новый email:'))">Email</button>
+                                <button class="btn btn-danger" onclick="archiveUser(${u.id})">Архив</button>
                             </div>
                         </div>
                     `).join('')}
@@ -332,12 +438,12 @@ async function renderApp() {
             </div>
             <div id="tab-prizes-admin" class="tab ${activeTab === 'prizes-admin' ? 'active' : ''}">
                 <div class="card">
-                    <div class="flex"><h3>🎁 Управление призами</h3><button class="btn btn-primary" id="addPrizeBtn">➕ Добавить приз</button></div>
+                    <div class="flex"><h3>Управление призами</h3><button class="btn btn-primary" id="addPrizeBtn">➕ Добавить приз</button></div>
                     ${prizes.map(p => `
                         <div class="prize-card">
                             <div><strong>${p.name}</strong><br>${p.description}<br>💰 ${p.cost} OKO</div>
                             <div>
-                                <button class="btn btn-secondary" onclick="editPrize(${p.id}, prompt('Название', '${p.name}'), prompt('Стоимость', ${p.cost}), prompt('Описание', '${p.description}'), prompt('Условия', '${p.conditions || ''}'), prompt('URL фото', '${p.image_url || ''}'))">✏️</button>
+                                <button class="btn btn-secondary" onclick="editPrize(${p.id}, prompt('Название','${p.name}'), prompt('Стоимость',${p.cost}), prompt('Описание','${p.description}'), prompt('Условия','${p.conditions||''}'), prompt('URL фото','${p.image_url||''}'))">✏️</button>
                                 <button class="btn btn-danger" onclick="deletePrize(${p.id})">🗑️</button>
                             </div>
                         </div>
@@ -347,37 +453,47 @@ async function renderApp() {
             ` : `
             <div id="tab-achievements" class="tab ${activeTab === 'achievements' ? 'active' : ''}">
                 <div class="card">
-                    <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn btn-primary" id="addAchievementBtn">➕ Добавить</button></div>
-                    <div id="achievementsList">
-                        ${achievements.map(a => `
-                            <div class="achievement-item">
-                                <div><div style="font-size:11px; color:#666;">${new Date(a.date).toLocaleString()}</div><div>✨ ${a.text}</div></div>
-                                <div><button class="btn btn-secondary" onclick="editAchievement(${a.id}, prompt('Новый текст:', '${a.text.replace(/'/g, "\\'")}'))">✏️</button> <button class="btn btn-danger" onclick="deleteAchievement(${a.id})">🗑️</button></div>
+                    <div class="flex"><h3>Мои достижения</h3><button class="btn btn-primary" id="addAchievementBtn">➕ Добавить</button></div>
+                    ${achievements.map(a => `
+                        <div class="achievement-item">
+                            <div><small>${new Date(a.date).toLocaleString()}</small><div>✨ ${a.text}</div></div>
+                            <div>
+                                <button class="btn btn-secondary" onclick="editAchievement(${a.id}, prompt('Новый текст:', '${a.text.replace(/'/g, "\\'")}'))">✏️</button>
+                                <button class="btn btn-danger" onclick="deleteAchievement(${a.id})">🗑️</button>
                             </div>
-                        `).join('') || '<p>Пока нет достижений</p>'}
-                    </div>
+                        </div>
+                    `).join('') || '<p>Нет достижений</p>'}
                 </div>
             </div>
             <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
-                <div class="card"><h3>📜 История начислений и списаний</h3>${userHistory.slice(0,50).map(h => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><small>${new Date(h.date).toLocaleString()}</small><br>${h.reason}: <strong>${h.delta > 0 ? '+' : ''}${h.delta}</strong> → баланс: ${currentUser.points}</div>`).join('') || 'Нет операций'}</div>
+                <div class="card">
+                    <h3>История операций</h3>
+                    ${userHistory.map(h => `
+                        <div style="padding:8px 0; border-bottom:1px solid #eee;">
+                            <small>${new Date(h.date).toLocaleString()}</small><br>
+                            ${h.reason}: <strong>${h.delta > 0 ? '+' : ''}${h.delta}</strong> → баланс: ${currentUser.points}
+                        </div>
+                    `).join('') || 'Нет операций'}
+                </div>
             </div>
             `}
             <div id="tab-profile" class="tab ${activeTab === 'profile' ? 'active' : ''}">
                 <div class="card">
                     <div class="flex">
                         <div style="text-align:center;">
-                            ${currentUser.photo ? `<img src="${currentUser.photo}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:2px solid #2d6a4f;">` : `<div style="width:100px;height:100px;background:#cbd5e1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;">👤</div>`}
-                            <div style="margin-top:8px;"><label class="btn btn-secondary" style="cursor:pointer;">📷 Загрузить фото<input type="file" id="profilePhotoInput" accept="image/jpeg,image/png" style="display:none;"></label></div>
+                            ${currentUser.photo ? `<img src="${currentUser.photo}" style="width:100px;height:100px;border-radius:50%;">` : '<div style="width:100px;height:100px;background:#cbd5e1;border-radius:50%;display:flex;align-items:center;justify-content:center;">👤</div>'}
+                            <div><label class="btn btn-secondary" style="cursor:pointer;">Загрузить фото<input type="file" id="profilePhotoInput" accept="image/*" style="display:none;"></label></div>
                         </div>
-                        <div style="flex:1;">
+                        <div>
                             <div><strong>ФИО:</strong> ${currentUser.name}</div>
                             <div><strong>⭐ Рейтинг:</strong> ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
                             <div><strong>💰 Баланс:</strong> ${currentUser.points} OKO</div>
-                            <div><strong>✉️ Email:</strong> ${currentUser.email || 'не указан'} <button class="btn btn-secondary" id="changeEmailBtn" style="margin-left:8px;">Изменить</button></div>
+                            <div><strong>✉️ Email:</strong> ${currentUser.email || 'не указан'} <button class="btn btn-secondary" id="changeEmailBtn">Изменить</button></div>
                         </div>
                     </div>
                 </div>
             </div>
+            ${isManager ? `<div class="card flex"><button class="btn btn-secondary" id="exportDataBtn">💾 Экспорт данных</button></div>` : ''}
         </div>
         <div id="prizeModal" class="modal"><div class="modal-content" id="modalContent"></div></div>
     `;
@@ -385,19 +501,17 @@ async function renderApp() {
     document.getElementById('app').innerHTML = html;
     document.getElementById('logoutBtn')?.addEventListener('click', doLogout);
     document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
+
     if (!isManager) {
         document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
-            const old = prompt('Старый пароль:');
-            const newp = prompt('Новый пароль (мин 8, заглавная, цифра, спецсимвол):');
+            const old = prompt('Старый пароль:'); const newp = prompt('Новый пароль (мин 8, заглавная, цифра, спецсимвол):');
             if (old && newp) await changeUserPassword(old, newp);
         });
         document.getElementById('addAchievementBtn')?.addEventListener('click', async () => {
-            const text = prompt('Текст достижения:');
-            if (text) await addAchievement(currentUser.id, text);
+            const text = prompt('Текст достижения:'); if (text) await addAchievement(currentUser.id, text);
         });
         document.getElementById('changeEmailBtn')?.addEventListener('click', async () => {
-            const email = prompt('Новый email:', currentUser.email || '');
-            if (email !== null) await updateUserEmail(currentUser.id, email);
+            const email = prompt('Новый email:', currentUser.email || ''); if (email !== null) await updateUserEmail(currentUser.id, email);
         });
         const photoInput = document.getElementById('profilePhotoInput');
         if (photoInput) photoInput.addEventListener('change', (e) => {
@@ -417,31 +531,14 @@ async function renderApp() {
         });
         document.getElementById('addPrizeBtn')?.addEventListener('click', () => {
             const name = prompt('Название'); const cost = prompt('Стоимость'); const desc = prompt('Описание');
-            const cond = prompt('Условия'); const img = prompt('URL фото');
+            const cond = prompt('Условия'); const img = prompt('URL фото (необязательно)');
             if (name && cost) addPrize(name, cost, desc, cond, img);
         });
-        // Экспорт данных
-        const exportBtn = document.createElement('button');
-        exportBtn.className = 'btn btn-secondary';
-        exportBtn.innerText = '💾 Экспорт данных';
-        exportBtn.onclick = async () => {
-            const users = await supabaseFetch('users', 'GET');
-            const prizes = await supabaseFetch('prizes', 'GET');
-            const history = await supabaseFetch('history', 'GET');
-            const data = { users, prizes, history };
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `oko_backup_${new Date().toISOString().slice(0,19)}.json`;
-            a.click();
-            showToast('Данные сохранены');
-        };
-        const adminBar = document.querySelector('#tab-users .card') || document.querySelector('#tab-prizes-admin .card');
-        if (adminBar) { const bar = document.createElement('div'); bar.className = 'flex'; bar.style.marginTop = '20px'; bar.appendChild(exportBtn); adminBar.appendChild(bar); }
+        document.getElementById('exportDataBtn')?.addEventListener('click', exportData);
     }
 }
 
-// Глобальные функции
+// ==================== ГЛОБАЛЬНЫЕ ФУНКЦИИ ====================
 window.doLogin = doLogin;
 window.doLogout = doLogout;
 window.updatePoints = updatePoints;
