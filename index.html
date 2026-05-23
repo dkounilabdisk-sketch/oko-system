@@ -2,493 +2,100 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>OKOин — мотивация сотрудников</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OKOин — вход</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .card { background: rgba(255,255,255,0.95); backdrop-filter: blur(4px); border-radius: 28px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
-        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
-        .employee-card, .prize-card, .achievement-item { background: white; border-radius: 20px; padding: 14px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .prize-card { cursor: pointer; transition: 0.2s; }
-        .prize-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .btn { padding: 8px 18px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; font-family: inherit; transition: 0.2s; }
-        .btn-primary { background: #2d6a4f; color: white; }
-        .btn-primary:hover { background: #1f543f; }
-        .btn-secondary { background: #e2e8f0; color: #1e293b; }
-        .btn-warning { background: #f97316; color: white; }
-        .btn-danger { background: #dc2626; color: white; }
-        .level-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 60px; font-size: 12px; font-weight: 700; }
-        .level-bronze { background: #cd7f32; color: white; }
-        .level-silver { background: #94a3b8; color: white; }
-        .level-gold { background: #fbbf24; color: #1e293b; }
-        .level-platinum { background: #c084fc; color: white; }
-        input, textarea { padding: 8px 16px; border-radius: 40px; border: 1px solid #cbd5e1; font-family: inherit; background: white; }
-        .avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .stat-card { background: rgba(255,255,255,0.7); border-radius: 24px; padding: 16px; text-align: center; }
-        .notification { position: fixed; bottom: 20px; right: 20px; background: white; padding: 12px 24px; border-radius: 60px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; animation: fadeIn 0.2s; max-width: 300px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; } }
-        @media (max-width: 700px) { body { padding: 12px; } .card { padding: 16px; } }
-        .tab { display: none; }
-        .tab.active { display: block; }
-        .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 12px; }
-        .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; }
-        .tab-btn.active { background: #2d6a4f; color: white; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 2000; }
-        .modal-content { background: white; border-radius: 28px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
-        .close-modal { background: none; border: none; font-size: 28px; cursor: pointer; float: right; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e0f0ea, #c8dfd6); margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .card { background: white; border-radius: 28px; padding: 32px; max-width: 400px; width: 100%; box-shadow: 0 8px 20px rgba(0,0,0,0.1); text-align: center; }
+        input { width: 100%; padding: 12px 16px; margin: 8px 0; border-radius: 60px; border: 1px solid #cbd5e1; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; background: #2d6a4f; color: white; border: none; padding: 12px; border-radius: 60px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+        h1 { margin-bottom: 24px; background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .error { color: red; margin-top: 12px; }
+        .success { color: green; margin-top: 12px; }
     </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app">
+    <div class="card">
+        <h1>🏆 OKOин</h1>
+        <input type="text" id="loginLogin" placeholder="Логин">
+        <input type="password" id="loginPass" placeholder="Пароль" onkeypress="if(event.key==='Enter') doLogin()">
+        <button onclick="doLogin()">Войти</button>
+        <div id="message" class="error"></div>
+    </div>
+</div>
+
 <script>
-// ==================== КОНФИГУРАЦИЯ SUPABASE ====================
-const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
+    // Конфигурация Supabase
+    const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
 
-// Глобальные переменные
-let currentUser = null;
-let activeTab = 'main';
+    let currentUser = null;
 
-// ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-function showToast(msg) {
-    const toast = document.createElement('div');
-    toast.className = 'notification';
-    toast.innerText = msg;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
+    async function doLogin() {
+        const login = document.getElementById('loginLogin').value.trim();
+        const password = document.getElementById('loginPass').value;
+        const msgDiv = document.getElementById('message');
 
-function getLevel(rating) {
-    if (rating >= 500) return { name: 'Платина', emoji: '💎', color: 'platinum' };
-    if (rating >= 300) return { name: 'Золото', emoji: '🥇', color: 'gold' };
-    if (rating >= 100) return { name: 'Серебро', emoji: '🥈', color: 'silver' };
-    return { name: 'Бронза', emoji: '🥉', color: 'bronze' };
-}
-function getLevelBadge(rating) { const l = getLevel(rating); return `<span class="level-badge level-${l.color}">${l.emoji} ${l.name}</span>`; }
-
-// ==================== ЗАПРОСЫ К SUPABASE ====================
-async function supabaseRequest(table, method, filters = {}, body = null, id = null) {
-    let url = `${SUPABASE_URL}/rest/v1/${table}`;
-    if (method === 'GET') {
-        const params = new URLSearchParams();
-        for (const [key, value] of Object.entries(filters)) {
-            params.append(key, `eq.${encodeURIComponent(value)}`);
+        if (!login || !password) {
+            msgDiv.innerText = 'Введите логин и пароль';
+            return;
         }
-        if (params.toString()) url += `?${params.toString()}`;
-        const res = await fetch(url, {
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-        });
-        return await res.json();
-    }
-    if (method === 'POST') {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        return await res.json();
-    }
-    if (method === 'PATCH') {
-        if (!id) throw new Error('id required for PATCH');
-        const res = await fetch(`${url}?id=eq.${id}`, {
-            method: 'PATCH',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        return await res.json();
-    }
-    if (method === 'DELETE') {
-        if (!id) throw new Error('id required for DELETE');
-        await fetch(`${url}?id=eq.${id}`, {
-            method: 'DELETE',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-        });
-        return { success: true };
-    }
-}
 
-// ==================== АУТЕНТИФИКАЦИЯ ====================
-async function login(login, password) {
-    try {
-        const url = `${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(password)}`;
-        const res = await fetch(url, {
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-        });
-        const data = await res.json();
-        if (data && data.length > 0) {
-            currentUser = data[0];
-            if (currentUser.status === 'archived') { alert('Аккаунт архивирован'); return; }
-            showToast(`Добро пожаловать, ${currentUser.name}`);
-            renderApp();
-        } else {
-            alert('Неверный логин или пароль');
+        try {
+            const url = `${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(password)}`;
+            const response = await fetch(url, {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+            });
+            const data = await response.json();
+
+            if (data && data.length > 0) {
+                currentUser = data[0];
+                if (currentUser.status === 'archived') {
+                    msgDiv.innerText = 'Аккаунт архивирован';
+                    return;
+                }
+                // Показать основной интерфейс
+                showMain();
+            } else {
+                msgDiv.innerText = 'Неверный логин или пароль';
+            }
+        } catch (err) {
+            console.error(err);
+            msgDiv.innerText = 'Ошибка соединения с сервером';
         }
-    } catch(e) { alert('Ошибка связи'); console.error(e); }
-}
-function logout() { currentUser = null; renderApp(); }
-
-// ==================== УПРАВЛЕНИЕ БАЛЛАМИ (С КОММЕНТАРИЕМ) ====================
-async function updatePoints(empId, delta) {
-    let reason = prompt('Укажите причину:', delta > 0 ? 'Бонус' : 'Замечание');
-    if (!reason) return;
-    // Получить текущие данные
-    const users = await supabaseRequest('users', 'GET', { id: empId });
-    if (!users.length) return;
-    const user = users[0];
-    const newPoints = user.points + delta;
-    const newRating = delta > 0 ? (user.rating + delta) : user.rating;
-    await supabaseRequest('users', 'PATCH', {}, { points: newPoints, rating: newRating }, empId);
-    await supabaseRequest('history', 'POST', {}, { user_id: empId, reason, delta });
-    if (currentUser.id === empId) {
-        currentUser.points = newPoints;
-        currentUser.rating = newRating;
     }
-    showToast(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} OKO (${reason})`);
-    renderApp();
-}
 
-// ==================== УПРАВЛЕНИЕ СОТРУДНИКАМИ ====================
-async function addUser(name, surname, login, password, points) {
-    const existing = await supabaseRequest('users', 'GET', { login });
-    if (existing.length) { alert('Логин занят'); return; }
-    await supabaseRequest('users', 'POST', {}, {
-        name, surname, login, password, role: 'employee',
-        points: parseInt(points), rating: parseInt(points), photo: '', email: '', status: 'active'
-    });
-    showToast(`Сотрудник ${name} добавлен`);
-    renderApp();
-}
-async function archiveUser(id) {
-    const users = await supabaseRequest('users', 'GET', { id });
-    if (!users.length) return;
-    const newStatus = users[0].status === 'archived' ? 'active' : 'archived';
-    await supabaseRequest('users', 'PATCH', {}, { status: newStatus }, id);
-    showToast(`Статус изменён`);
-    renderApp();
-}
-async function updateUserEmail(id, email) {
-    await supabaseRequest('users', 'PATCH', {}, { email }, id);
-    if (currentUser.id === id) currentUser.email = email;
-    showToast('Email обновлён');
-    renderApp();
-}
-async function updateUserPoints(id, newPoints) {
-    await supabaseRequest('users', 'PATCH', {}, { points: newPoints, rating: newPoints }, id);
-    if (currentUser.id === id) { currentUser.points = newPoints; currentUser.rating = newPoints; }
-    showToast('Баланс обновлён');
-    renderApp();
-}
-async function changePassword(oldPwd, newPwd) {
-    if (currentUser.password !== oldPwd) { alert('Неверный старый пароль'); return false; }
-    if (newPwd.length < 8 || !/[A-Z]/.test(newPwd) || !/[0-9]/.test(newPwd) || !/[!@#$%^&*]/.test(newPwd)) {
-        alert('Пароль: мин 8, заглавная, цифра, спецсимвол');
-        return false;
-    }
-    await supabaseRequest('users', 'PATCH', {}, { password: newPwd }, currentUser.id);
-    currentUser.password = newPwd;
-    alert('Пароль изменён');
-    return true;
-}
-async function updateUserPhoto(userId, dataUrl) {
-    await supabaseRequest('users', 'PATCH', {}, { photo: dataUrl }, userId);
-    if (currentUser.id === userId) currentUser.photo = dataUrl;
-    showToast('Фото обновлено');
-    renderApp();
-}
-
-// ==================== ДОСТИЖЕНИЯ ====================
-async function getAchievements(userId) {
-    return await supabaseRequest('achievements', 'GET', { user_id: userId });
-}
-async function addAchievement(userId, text) {
-    await supabaseRequest('achievements', 'POST', {}, { user_id: userId, text });
-    showToast('Достижение добавлено');
-    renderApp();
-}
-async function deleteAchievement(id) {
-    await supabaseRequest('achievements', 'DELETE', {}, {}, id);
-    renderApp();
-}
-async function editAchievement(id, newText) {
-    await supabaseRequest('achievements', 'PATCH', {}, { text: newText }, id);
-    showToast('Достижение обновлено');
-    renderApp();
-}
-
-// ==================== ПРИЗЫ (CRUD) ====================
-async function loadPrizes() {
-    return await supabaseRequest('prizes', 'GET', {}, { order: 'cost.asc' });
-}
-async function addPrize(name, cost, desc, conditions, imageUrl) {
-    await supabaseRequest('prizes', 'POST', {}, { name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl });
-    showToast(`Приз "${name}" добавлен`);
-    renderApp();
-}
-async function editPrize(id, name, cost, desc, conditions, imageUrl) {
-    await supabaseRequest('prizes', 'PATCH', {}, { name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl }, id);
-    showToast(`Приз изменён`);
-    renderApp();
-}
-async function deletePrize(id) {
-    await supabaseRequest('prizes', 'DELETE', {}, {}, id);
-    showToast(`Приз удалён`);
-    renderApp();
-}
-function showPrizeModal(prize) {
-    const modal = document.getElementById('prizeModal');
-    const content = document.getElementById('modalContent');
-    content.innerHTML = `
-        <div class="modal-header"><h2>${prize.name}</h2><button class="close-modal">&times;</button></div>
-        <div><strong>📖 Описание:</strong> ${prize.description}</div>
-        <div style="margin-top:12px;"><strong>💰 Стоимость:</strong> ${prize.cost} OKO</div>
-        <div style="margin-top:12px;"><strong>📌 Условия и ограничения:</strong><br>${prize.conditions || 'Нет'}</div>
-        ${prize.image_url ? `<div style="margin-top:12px;"><img src="${prize.image_url}" style="max-width:100%; border-radius:16px;"></div>` : ''}
-    `;
-    modal.style.display = 'flex';
-    modal.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
-    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
-}
-
-// ==================== ЗАГРУЗКА ДАННЫХ ДЛЯ ИНТЕРФЕЙСА ====================
-async function loadEmployees() {
-    return await supabaseRequest('users', 'GET', { role: 'employee', status: 'active' });
-}
-async function loadHistory(userId = null) {
-    let filter = userId ? { user_id: userId } : {};
-    let data = await supabaseRequest('history', 'GET', filter);
-    data.sort((a,b) => new Date(b.date) - new Date(a.date));
-    return data;
-}
-
-// ==================== ОТРИСОВКА ИНТЕРФЕЙСА ====================
-function setActiveTab(tab) { activeTab = tab; renderApp(); }
-
-async function renderApp() {
-    if (!currentUser) {
-        // Форма входа
+    function showMain() {
+        const isManager = currentUser.role === 'manager';
         document.getElementById('app').innerHTML = `
-            <div style="max-width:400px; margin:50px auto;">
+            <div style="max-width: 800px; margin: 0 auto;">
                 <div class="card">
-                    <h1 style="text-align:center;">🏆 OKOин</h1>
-                    <input type="text" id="loginLogin" placeholder="Логин" style="width:100%; margin-bottom:12px;">
-                    <input type="password" id="loginPass" placeholder="Пароль" style="width:100%; margin-bottom:12px;" onkeypress="if(event.key==='Enter') login(document.getElementById('loginLogin').value, document.getElementById('loginPass').value)">
-                    <button class="btn btn-primary" style="width:100%;" onclick="login(document.getElementById('loginLogin').value, document.getElementById('loginPass').value)">Войти</button>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>👋 Привет, ${currentUser.name}</h2>
+                        <button onclick="doLogout()" style="width: auto;">Выйти</button>
+                    </div>
+                    <p>⭐ Рейтинг: ${currentUser.rating} | 💰 Баланс: ${currentUser.points} OKO</p>
+                    <p>Роль: ${isManager ? 'Менеджер' : 'Сотрудник'}</p>
+                    <hr>
+                    <p>✅ Вы успешно вошли в систему.</p>
+                    <p>Дальше мы добавим список сотрудников, призы, достижения и историю.</p>
                 </div>
             </div>
         `;
-        return;
     }
 
-    const isManager = currentUser.role === 'manager';
-    const employees = await loadEmployees();
-    const prizes = await loadPrizes();
-    const userHistory = await loadHistory(currentUser.id);
-    const achievements = await getAchievements(currentUser.id);
-
-    const html = `
-        <div class="container">
-            <div class="card flex">
-                <h1 style="background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent;">🏆 OKOин</h1>
-                <div class="flex">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar">` : `<div class="avatar" style="background:#cbd5e1; display:flex; align-items:center; justify-content:center;">👤</div>`}
-                        <div><strong>${currentUser.name}</strong> ⭐ ${currentUser.rating}<br>${getLevelBadge(currentUser.rating)}</div>
-                    </div>
-                    <button class="btn btn-secondary" id="logoutBtn">Выйти</button>
-                    ${!isManager ? `<button class="btn btn-secondary" id="changePwdBtn">🔑 Сменить пароль</button>` : ''}
-                </div>
-            </div>
-
-            <div class="tab-buttons">
-                <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">🏠 Главная</button>
-                ${isManager ? `<button class="tab-btn ${activeTab === 'users' ? 'active' : ''}" data-tab="users">👥 Управление</button>` : ''}
-                ${isManager ? `<button class="tab-btn ${activeTab === 'prizes-admin' ? 'active' : ''}" data-tab="prizes-admin">🎁 Управление призами</button>` : ''}
-                ${!isManager ? `<button class="tab-btn ${activeTab === 'achievements' ? 'active' : ''}" data-tab="achievements">🌟 Достижения</button>` : ''}
-                ${!isManager ? `<button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" data-tab="history">📜 История</button>` : ''}
-                <button class="tab-btn ${activeTab === 'profile' ? 'active' : ''}" data-tab="profile">👤 Профиль</button>
-            </div>
-
-            <!-- ГЛАВНАЯ -->
-            <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
-                <div class="grid-2">
-                    <div class="card">
-                        <h3>👥 Команда</h3>
-                        ${employees.map(emp => `
-                            <div class="employee-card">
-                                <div style="display:flex; align-items:center; gap:12px;">
-                                    <div>${emp.photo ? `<img src="${emp.photo}" style="width:40px;height:40px;border-radius:50%;">` : '<div style="width:40px;height:40px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;">👤</div>'}</div>
-                                    <div><strong>${emp.name}</strong> ${getLevelBadge(emp.rating)}<br>💰 ${emp.points} OKO</div>
-                                </div>
-                                ${isManager ? `
-                                    <div>
-                                        <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 5)">+5</button>
-                                        <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 10)">+10</button>
-                                        <button class="btn btn-warning" onclick="let a=prompt('Сумма списания'); if(a) updatePoints(${emp.id}, -parseInt(a))">-</button>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `).join('')}
-                        ${isManager ? `<div style="margin-top:16px;"><button class="btn btn-primary" id="addUserBtn">➕ Добавить сотрудника</button></div>` : ''}
-                    </div>
-                    <div class="card">
-                        <h3>🎁 Призы</h3>
-                        ${prizes.map(p => `<div class="prize-card" onclick="showPrizeModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br>${p.description}</div><div><span class="level-badge level-gold">${p.cost} OKO</span></div></div>`).join('')}
-                        ${!isManager ? `<div style="margin-top:16px; background:#d1fae5; padding:12px; border-radius:20px;">🎯 Доступно: ${prizes.filter(p => p.cost <= currentUser.points).length} призов</div>` : ''}
-                    </div>
-                </div>
-            </div>
-
-            ${isManager ? `
-            <div id="tab-users" class="tab ${activeTab === 'users' ? 'active' : ''}">
-                <div class="card">
-                    <h3>📋 Управление сотрудниками</h3>
-                    ${employees.map(u => `
-                        <div class="employee-card">
-                            <div><strong>${u.name}</strong> (${u.login})<br>💰 ${u.points} OKO | ⭐ ${u.rating}<br>📧 ${u.email || '-'}</div>
-                            <div class="flex">
-                                <button class="btn btn-secondary" onclick="updateUserPoints(${u.id}, parseInt(prompt('Новый баланс:', ${u.points})))">✏️ Баланс</button>
-                                <button class="btn btn-secondary" onclick="updateUserEmail(${u.id}, prompt('Новый email:'))">✉️ Email</button>
-                                <button class="btn btn-danger" onclick="archiveUser(${u.id})">${u.status === 'archived' ? 'Восстановить' : 'Архив'}</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            <div id="tab-prizes-admin" class="tab ${activeTab === 'prizes-admin' ? 'active' : ''}">
-                <div class="card">
-                    <div class="flex"><h3>🎁 Управление призами</h3><button class="btn btn-primary" id="addPrizeBtn">➕ Добавить приз</button></div>
-                    ${prizes.map(p => `
-                        <div class="prize-card">
-                            <div><strong>${p.name}</strong><br>${p.description}<br>💰 ${p.cost} OKO</div>
-                            <div>
-                                <button class="btn btn-secondary" onclick="editPrize(${p.id}, prompt('Название', '${p.name}'), prompt('Стоимость', ${p.cost}), prompt('Описание', '${p.description}'), prompt('Условия', '${p.conditions || ''}'), prompt('URL фото', '${p.image_url || ''}'))">✏️</button>
-                                <button class="btn btn-danger" onclick="deletePrize(${p.id})">🗑️</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            ` : `
-            <div id="tab-achievements" class="tab ${activeTab === 'achievements' ? 'active' : ''}">
-                <div class="card">
-                    <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn btn-primary" id="addAchievementBtn">➕ Добавить</button></div>
-                    <div id="achievementsList">
-                        ${achievements.map(a => `
-                            <div class="achievement-item">
-                                <div><div style="font-size:11px; color:#666;">${new Date(a.date).toLocaleString()}</div><div>✨ ${a.text}</div></div>
-                                <div><button class="btn btn-secondary" onclick="editAchievement(${a.id}, prompt('Новый текст:', '${a.text.replace(/'/g, "\\'")}'))">✏️</button><button class="btn btn-danger" onclick="deleteAchievement(${a.id})">🗑️</button></div>
-                            </div>
-                        `).join('') || '<p>Пока нет достижений</p>'}
-                    </div>
-                </div>
-            </div>
-            <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
-                <div class="card"><h3>📜 История начислений и списаний</h3>${userHistory.slice(0,50).map(h => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><small>${new Date(h.date).toLocaleString()}</small><br>${h.reason}: <strong>${h.delta > 0 ? '+' : ''}${h.delta}</strong> → баланс: ${currentUser.points}</div>`).join('') || 'Нет операций'}</div>
-            </div>
-            `}
-            <div id="tab-profile" class="tab ${activeTab === 'profile' ? 'active' : ''}">
-                <div class="card">
-                    <div class="flex">
-                        <div style="text-align:center;">
-                            ${currentUser.photo ? `<img src="${currentUser.photo}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:2px solid #2d6a4f;">` : `<div style="width:100px;height:100px;background:#cbd5e1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;">👤</div>`}
-                            <div style="margin-top:8px;"><label class="btn btn-secondary" style="cursor:pointer;">📷 Загрузить фото<input type="file" id="profilePhotoInput" accept="image/jpeg,image/png" style="display:none;"></label></div>
-                        </div>
-                        <div style="flex:1;">
-                            <div><strong>ФИО:</strong> ${currentUser.name}</div>
-                            <div><strong>⭐ Рейтинг:</strong> ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
-                            <div><strong>💰 Баланс:</strong> ${currentUser.points} OKO</div>
-                            <div><strong>✉️ Email:</strong> ${currentUser.email || 'не указан'} <button class="btn btn-secondary" id="changeEmailBtn" style="margin-left:8px;">Изменить</button></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="prizeModal" class="modal"><div class="modal-content" id="modalContent"></div></div>
-    `;
-
-    document.getElementById('app').innerHTML = html;
-
-    // Обработчики
-    document.getElementById('logoutBtn')?.addEventListener('click', logout);
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
-    if (!isManager) {
-        document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
-            const old = prompt('Старый пароль:');
-            const newp = prompt('Новый пароль (мин 8, заглавная, цифра, спецсимвол):');
-            if (old && newp) await changePassword(old, newp);
-        });
-        document.getElementById('addAchievementBtn')?.addEventListener('click', async () => {
-            const text = prompt('Текст достижения:');
-            if (text) await addAchievement(currentUser.id, text);
-        });
-        document.getElementById('changeEmailBtn')?.addEventListener('click', async () => {
-            const email = prompt('Новый email:', currentUser.email || '');
-            if (email !== null) await updateUserEmail(currentUser.id, email);
-        });
-        const photoInput = document.getElementById('profilePhotoInput');
-        if (photoInput) photoInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file && file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (ev) => updateUserPhoto(currentUser.id, ev.target.result);
-                reader.readAsDataURL(file);
-            }
-        });
+    function doLogout() {
+        currentUser = null;
+        // Перезагружаем страницу, чтобы вернуть форму входа (проще всего)
+        location.reload();
     }
-    if (isManager) {
-        document.getElementById('addUserBtn')?.addEventListener('click', () => {
-            const name = prompt('Имя'); const surname = prompt('Фамилия'); const login = prompt('Логин');
-            const password = prompt('Пароль'); const points = parseInt(prompt('Начальные баллы', 0));
-            if (name && surname && login && password) addUser(name, surname, login, password, points);
-        });
-        document.getElementById('addPrizeBtn')?.addEventListener('click', () => {
-            const name = prompt('Название'); const cost = prompt('Стоимость'); const desc = prompt('Описание');
-            const cond = prompt('Условия'); const img = prompt('URL фото');
-            if (name && cost) addPrize(name, cost, desc, cond, img);
-        });
-        // Экспорт (опционально)
-        const exportBtn = document.createElement('button');
-        exportBtn.className = 'btn btn-secondary';
-        exportBtn.innerText = '💾 Экспорт данных';
-        exportBtn.onclick = async () => {
-            const users = await supabaseRequest('users', 'GET');
-            const prizes = await supabaseRequest('prizes', 'GET');
-            const history = await supabaseRequest('history', 'GET');
-            const data = { users, prizes, history };
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `oko_backup_${new Date().toISOString().slice(0,19)}.json`;
-            a.click();
-            showToast('Данные сохранены');
-        };
-        const adminBar = document.querySelector('#tab-users .card') || document.querySelector('#tab-prizes-admin .card');
-        if (adminBar) { const bar = document.createElement('div'); bar.className = 'flex'; bar.style.marginTop = '20px'; bar.appendChild(exportBtn); adminBar.appendChild(bar); }
-    }
-}
 
-// Глобальные функции для onclick
-window.login = login;
-window.logout = logout;
-window.updatePoints = updatePoints;
-window.archiveUser = archiveUser;
-window.updateUserEmail = updateUserEmail;
-window.updateUserPoints = updateUserPoints;
-window.addPrize = addPrize;
-window.editPrize = editPrize;
-window.deletePrize = deletePrize;
-window.showPrizeModal = showPrizeModal;
-window.addAchievement = addAchievement;
-window.deleteAchievement = deleteAchievement;
-window.editAchievement = editAchievement;
-
-// Запуск
-renderApp();
+    window.doLogin = doLogin;
+    window.doLogout = doLogout;
 </script>
 </body>
 </html>
