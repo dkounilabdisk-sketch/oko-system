@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>OKOин — мотивация сотрудников (Supabase)</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -48,14 +47,13 @@
 <body>
 <div id="app"></div>
 <script>
-// ======================== ПОДКЛЮЧЕНИЕ К SUPABASE ========================
-const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co/rest/v1/';    // ЗАМЕНИТЕ
-const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4'; // ЗАМЕНИТЕ
+// ======================== ПОДКЛЮЧЕНИЕ К SUPABASE (ВАШИ ДАННЫЕ) ========================
+const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';  // ваш URL
+const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4'; // ваш anon key
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 
-// ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================
 function showToast(msg) {
     const toast = document.createElement('div');
     toast.className = 'notification';
@@ -72,7 +70,6 @@ function getLevel(rating) {
 }
 function getLevelBadge(rating) { const l = getLevel(rating); return `<span class="level-badge level-${l.color}">${l.emoji} ${l.name}</span>`; }
 
-// ======================== АУТЕНТИФИКАЦИЯ ========================
 async function login(login, pwd) {
     const { data, error } = await supabase
         .from('users')
@@ -94,14 +91,12 @@ async function login(login, pwd) {
 }
 function logout() { currentUser = null; renderApp(); }
 
-// ======================== ОПЕРАЦИИ С БАЛЛАМИ ========================
 async function updatePoints(empId, delta, reasonFromPrompt = true) {
     let reason = '';
     if (reasonFromPrompt) {
         reason = prompt('Укажите причину начисления/списания:', delta > 0 ? 'Бонус' : 'Замечание');
         if (!reason) return;
     }
-    // Получаем текущие данные пользователя
     const { data: userData, error: fetchError } = await supabase
         .from('users')
         .select('points, rating')
@@ -110,13 +105,11 @@ async function updatePoints(empId, delta, reasonFromPrompt = true) {
     if (fetchError) { alert('Ошибка получения данных'); return; }
     const newPoints = userData.points + delta;
     const newRating = delta > 0 ? (userData.rating + delta) : userData.rating;
-    // Обновляем пользователя
     const { error: updateError } = await supabase
         .from('users')
         .update({ points: newPoints, rating: newRating })
         .eq('id', empId);
     if (updateError) { alert('Ошибка обновления баланса'); return; }
-    // Добавляем запись в историю
     await supabase.from('history').insert([{ user_id: empId, reason, delta }]);
     if (currentUser && currentUser.id === empId) {
         currentUser.points = newPoints;
@@ -126,9 +119,7 @@ async function updatePoints(empId, delta, reasonFromPrompt = true) {
     showToast(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} OKO (${reason})`);
 }
 
-// ======================== УПРАВЛЕНИЕ СОТРУДНИКАМИ ========================
 async function addUser(name, surname, login, password, points) {
-    // Проверяем логин на уникальность
     const { data: existing } = await supabase.from('users').select('id').eq('login', login);
     if (existing && existing.length) { alert('Логин занят'); return; }
     const { error } = await supabase.from('users').insert([{
@@ -162,7 +153,6 @@ async function changePassword(login, oldPwd, newPwd) {
 }
 
 async function updateUserPhoto(userId, dataUrl) {
-    // Фото хранится как base64 в таблице (можно потом перенести в Storage, но для простоты оставим так)
     await supabase.from('users').update({ photo: dataUrl }).eq('id', userId);
     if (currentUser && currentUser.id === userId) currentUser.photo = dataUrl;
     renderApp();
@@ -182,7 +172,6 @@ async function updateUserPoints(id, newPoints) {
     showToast('Баланс обновлён');
 }
 
-// ======================== ДОСТИЖЕНИЯ ========================
 async function getAchievements(userId) {
     const { data } = await supabase.from('achievements').select('*').eq('user_id', userId).order('date', { ascending: false });
     return data || [];
@@ -202,7 +191,6 @@ async function editAchievement(id, newText) {
     showToast('Достижение обновлено');
 }
 
-// ======================== УПРАВЛЕНИЕ ПРИЗАМИ ========================
 async function loadPrizes() {
     const { data } = await supabase.from('prizes').select('*').order('cost');
     return data || [];
@@ -223,7 +211,6 @@ async function deletePrize(id) {
     showToast(`Приз удалён`);
 }
 
-// ======================== ИСТОРИЯ, КОМАНДА ========================
 async function loadEmployees() {
     const { data } = await supabase.from('users').select('*').eq('role', 'employee').neq('status', 'archived');
     return data || [];
@@ -235,7 +222,6 @@ async function loadHistory(userId = null) {
     return data || [];
 }
 
-// ======================== МОДАЛЬНОЕ ОКНО ДЛЯ ПРИЗА ========================
 function showPrizeModal(prize) {
     const modal = document.getElementById('prizeModal');
     const content = document.getElementById('modalContent');
@@ -254,7 +240,6 @@ function showPrizeModal(prize) {
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 }
 
-// ======================== ЭКСПОРТ/ИМПОРТ (для менеджера) ========================
 async function exportData() {
     const users = await supabase.from('users').select('*');
     const prizes = await supabase.from('prizes').select('*');
@@ -265,16 +250,14 @@ async function exportData() {
     a.href = URL.createObjectURL(blob);
     a.download = `oko_backup_${new Date().toISOString().slice(0,19)}.json`;
     a.click();
-    showToast('Данные сохранены в файл (только чтение, импорт не реализован)');
+    showToast('Данные сохранены в файл');
 }
 
-// ======================== ОТРИСОВКА ИНТЕРФЕЙСА ========================
 let activeTab = 'main';
 function setActiveTab(tabId) { activeTab = tabId; renderApp(); }
 
 async function renderApp() {
     if (!currentUser) {
-        // Форма входа
         document.getElementById('app').innerHTML = `
             <div class="container">
                 <div class="card flex">
@@ -467,7 +450,6 @@ async function renderApp() {
             const imageUrl = prompt('URL фото (необязательно)');
             if (name && cost) addPrize(name, cost, desc, conditions, imageUrl);
         });
-        // Экспорт
         const exportBtn = document.createElement('button');
         exportBtn.className = 'btn btn-secondary';
         exportBtn.innerText = '💾 Экспорт данных';
@@ -477,7 +459,6 @@ async function renderApp() {
     }
 }
 
-// Глобальные функции
 window.updatePoints = updatePoints;
 window.archiveUser = archiveUser;
 window.deleteAchievement = deleteAchievement;
