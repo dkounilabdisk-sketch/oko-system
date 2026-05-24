@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ОКОИНЫ — мотивация сотрудников</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -11,52 +11,45 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
-        .card { background: rgba(255,255,255,0.96); backdrop-filter: blur(4px); border-radius: 28px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); transition: all 0.2s; }
+        .card { background: rgba(255,255,255,0.96); backdrop-filter: blur(4px); border-radius: 28px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
         .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
         .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
-        .employee-card, .prize-card, .achievement-item { background: white; border-radius: 20px; padding: 14px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .employee-card, .prize-card, .achievement-item { background: white; border-radius: 20px; padding: 14px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; cursor: pointer; transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .employee-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.1); }
         .prize-card { cursor: pointer; }
         .prize-card:hover { transform: translateY(-2px); background: #f8fafc; }
-        .btn { padding: 8px 18px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
-        .btn-primary { background: #2d6a4f; color: white; box-shadow: 0 2px 6px rgba(45,106,79,0.3); }
-        .btn-primary:hover { background: #1f543f; transform: translateY(-1px); }
+        .btn { padding: 8px 18px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; }
+        .btn-primary { background: #2d6a4f; color: white; }
+        .btn-primary:hover { background: #1f543f; }
         .btn-secondary { background: #e2e8f0; color: #1e293b; }
         .btn-secondary:hover { background: #cbd5e1; }
         .btn-warning { background: #f97316; color: white; }
-        .btn-warning:hover { background: #ea580c; }
         .btn-danger { background: #dc2626; color: white; }
-        .btn-danger:hover { background: #b91c1c; }
         .level-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 60px; font-size: 12px; font-weight: 700; }
         .level-bronze { background: linear-gradient(135deg, #cd7f32, #b8692a); color: white; }
         .level-silver { background: linear-gradient(135deg, #94a3b8, #7e8a98); color: white; }
         .level-gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1e293b; }
         .level-platinum { background: linear-gradient(135deg, #c084fc, #a855f7); color: white; }
-        input, textarea { padding: 10px 16px; border-radius: 60px; border: 1px solid #cbd5e1; background: white; font-family: inherit; font-size: 14px; transition: all 0.2s; }
-        input:focus, textarea:focus { outline: none; border-color: #2d6a4f; box-shadow: 0 0 0 3px rgba(45,106,79,0.1); }
-        textarea { border-radius: 20px; min-height: 80px; resize: vertical; }
+        input, textarea { padding: 10px 16px; border-radius: 60px; border: 1px solid #cbd5e1; background: white; font-family: inherit; font-size: 14px; }
+        input:focus { outline: none; border-color: #2d6a4f; box-shadow: 0 0 0 3px rgba(45,106,79,0.1); }
         .avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
         .avatar-large { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #2d6a4f; background: #e2e8f0; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .stat-card { background: rgba(255,255,255,0.7); border-radius: 24px; padding: 16px; text-align: center; backdrop-filter: blur(4px); }
-        .notification { position: fixed; bottom: 20px; right: 20px; background: white; padding: 12px 24px; border-radius: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; animation: slideIn 0.3s ease; max-width: 350px; font-size: 14px; }
+        .stat-card { background: rgba(255,255,255,0.7); border-radius: 24px; padding: 16px; text-align: center; }
+        .notification { position: fixed; bottom: 20px; right: 20px; background: white; padding: 12px 24px; border-radius: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; animation: slideIn 0.3s; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
         .tab { display: none; }
-        .tab.active { display: block; animation: fadeIn 0.2s ease; }
+        .tab.active { display: block; animation: fadeIn 0.2s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 12px; }
-        .tab-btn { background: none; border: none; padding: 8px 24px; font-weight: 600; cursor: pointer; border-radius: 60px; transition: all 0.2s; font-family: inherit; font-size: 14px; }
-        .tab-btn:hover { background: rgba(45,106,79,0.1); }
-        .tab-btn.active { background: #2d6a4f; color: white; box-shadow: 0 2px 8px rgba(45,106,79,0.3); }
+        .tab-btn { background: none; border: none; padding: 8px 24px; font-weight: 600; cursor: pointer; border-radius: 60px; font-size: 14px; }
+        .tab-btn.active { background: #2d6a4f; color: white; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 2000; }
-        .modal-content { background: white; border-radius: 28px; padding: 28px; max-width: 550px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
-        .close-modal { float: right; font-size: 28px; cursor: pointer; background: none; border: none; color: #666; transition: all 0.2s; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .close-modal:hover { background: #f0f0f0; color: #000; }
+        .modal-content { background: white; border-radius: 28px; padding: 28px; max-width: 550px; width: 90%; max-height: 85vh; overflow-y: auto; }
+        .close-modal { float: right; font-size: 28px; cursor: pointer; background: none; border: none; }
         .chart-container { max-height: 280px; margin-top: 20px; }
         .login-container { max-width: 420px; margin: 60px auto; }
-        .error { color: #dc2626; margin-top: 12px; text-align: center; font-size: 14px; }
-        .badge { background: #ef4444; color: white; font-size: 11px; border-radius: 60px; padding: 2px 8px; margin-left: 8px; }
-        @media (max-width: 700px) { body { padding: 12px; } .card { padding: 16px; } .tab-btn { padding: 6px 16px; font-size: 12px; } }
+        .error { color: #dc2626; margin-top: 12px; text-align: center; }
     </style>
 </head>
 <body>
@@ -75,6 +68,7 @@ let achievements = [];
 let levelConfig = null;
 let activeTab = 'main';
 let dashboardChart = null;
+let dataLoaded = false;
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ====================
 function showToast(msg, isError = false) {
@@ -123,7 +117,7 @@ async function apiFetch(url, options = {}) {
     }
 }
 
-// ==================== ЗАГРУЗКА ДАННЫХ ====================
+// ==================== ЗАГРУЗКА ДАННЫХ (ПОСЛЕ ВХОДА) ====================
 async function loadLevels() {
     const data = await apiFetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.levels`);
     if (data && data.length && data[0].value) {
@@ -140,6 +134,7 @@ async function loadLevels() {
 
 async function loadAllData() {
     if (!currentUser) return;
+    showToast('Загрузка данных...');
     await loadLevels();
     const [empData, prizeData, histData, achData] = await Promise.all([
         apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`),
@@ -151,22 +146,35 @@ async function loadAllData() {
     if (prizeData) prizes = prizeData;
     if (histData) allHistory = histData;
     if (achData) achievements = achData;
+    dataLoaded = true;
+    showToast('Данные загружены');
+    renderApp();
 }
 
-// ==================== АУТЕНТИФИКАЦИЯ ====================
+// ==================== АУТЕНТИФИКАЦИЯ (МГНОВЕННАЯ) ====================
 async function doLogin() {
     const login = document.getElementById('loginLogin').value.trim();
     const password = document.getElementById('loginPass').value;
     const errorDiv = document.getElementById('errorMsg');
-    if (!login || !password) { errorDiv.innerText = 'Введите логин и пароль'; return; }
+    
+    if (!login || !password) {
+        errorDiv.innerText = 'Введите логин и пароль';
+        return;
+    }
+    
+    errorDiv.innerText = 'Проверка...';
     
     const data = await apiFetch(`${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(password)}`);
+    
     if (data && data.length) {
         currentUser = data[0];
-        if (currentUser.status === 'archived') { errorDiv.innerText = 'Аккаунт архивирован'; return; }
+        if (currentUser.status === 'archived') {
+            errorDiv.innerText = 'Аккаунт архивирован';
+            return;
+        }
         localStorage.setItem('oko_current_user', JSON.stringify(currentUser));
-        await loadAllData();
-        renderApp();
+        renderApp(); // Показываем интерфейс (сразу с пустыми данными)
+        loadAllData(); // Грузим данные в фоне
         showToast(`Добро пожаловать, ${getFullName(currentUser)} 🎉`);
     } else {
         errorDiv.innerText = 'Неверный логин или пароль';
@@ -176,10 +184,11 @@ async function doLogin() {
 function doLogout() {
     currentUser = null;
     localStorage.removeItem('oko_current_user');
+    dataLoaded = false;
     renderApp();
 }
 
-// ==================== ФОТО (STORAGE) ====================
+// ==================== ФОТО ====================
 async function updateUserPhoto(userId, file) {
     if (!file || !file.type.startsWith('image/')) {
         showToast('Выберите изображение', true);
@@ -200,7 +209,7 @@ async function updateUserPhoto(userId, file) {
             headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
             body: file
         });
-        if (!uploadRes.ok) throw new Error('Ошибка загрузки');
+        if (!uploadRes.ok) throw new Error('Upload failed');
         
         const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/avatars/${fileName}`;
         await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
@@ -215,7 +224,6 @@ async function updateUserPhoto(userId, file) {
         showToast('Фото обновлено! ✅');
         renderApp();
     } catch(e) {
-        console.error(e);
         showToast('Ошибка загрузки фото', true);
     }
 }
@@ -234,7 +242,6 @@ async function updatePoints(empId, delta) {
         method: 'PATCH',
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
-    
     await apiFetch(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         body: JSON.stringify({ user_id: empId, reason, delta })
@@ -245,7 +252,7 @@ async function updatePoints(empId, delta) {
     if (currentUser.id === empId) { currentUser.points = newPoints; currentUser.rating = newRating; }
     allHistory.unshift({ date: new Date().toISOString(), user_id: empId, reason, delta });
     
-    showToast(`${delta > 0 ? '✅ Начислено' : '📤 Списано'} ${Math.abs(delta)} ОКОИНОВ (${reason})`);
+    showToast(`${delta > 0 ? '✅ Начислено' : '📤 Списано'} ${Math.abs(delta)} ОКОИНОВ`);
     renderApp();
 }
 
@@ -255,7 +262,7 @@ async function addUser(name, surname, login, password, points) {
     const newUser = { name, surname, login, password, role: 'employee', points: parseInt(points), rating: parseInt(points), photo: '', email: '', status: 'active' };
     await apiFetch(`${SUPABASE_URL}/rest/v1/users`, { method: 'POST', body: JSON.stringify(newUser) });
     employees = await apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
-    showToast(`➕ Сотрудник ${name} ${surname} добавлен`);
+    showToast(`➕ Сотрудник добавлен`);
     renderApp();
 }
 
@@ -265,7 +272,7 @@ async function archiveUser(id) {
     const newStatus = emp.status === 'archived' ? 'active' : 'archived';
     await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
     employees = await apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
-    showToast(newStatus === 'archived' ? '📦 Сотрудник архивирован' : '🔄 Сотрудник восстановлен');
+    showToast(newStatus === 'archived' ? '📦 В архиве' : '🔄 Восстановлен');
     renderApp();
 }
 
@@ -356,20 +363,19 @@ function showPrizeModal(prize) {
     const content = document.getElementById('modalContent');
     content.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="color:#2d6a4f;">${prize.name}</h2>
+            <h2>${prize.name}</h2>
             <button class="close-modal">&times;</button>
         </div>
-        <div style="margin-bottom:16px;"><strong>📖 Описание:</strong><br>${(prize.description || '').replace(/\n/g, '<br>')}</div>
-        <div style="margin-bottom:16px;"><strong>💰 Стоимость:</strong> ${prize.cost} ОКОИНОВ</div>
-        <div><strong>📌 Условия получения:</strong><br>${(prize.conditions || 'Нет дополнительных условий').replace(/\n/g, '<br>')}</div>
-        ${prize.image_url ? `<div style="margin-top:16px;"><img src="${prize.image_url}" style="max-width:100%; border-radius:16px;"></div>` : ''}
+        <div><strong>📖 Описание:</strong><br>${(prize.description || '').replace(/\n/g, '<br>')}</div>
+        <div style="margin-top:12px;"><strong>💰 Стоимость:</strong> ${prize.cost} ОКОИНОВ</div>
+        <div style="margin-top:12px;"><strong>📌 Условия:</strong><br>${(prize.conditions || 'Нет').replace(/\n/g, '<br>')}</div>
+        ${prize.image_url ? `<div style="margin-top:12px;"><img src="${prize.image_url}" style="max-width:100%; border-radius:16px;"></div>` : ''}
     `;
     modal.style.display = 'flex';
     modal.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 }
 
-// ==================== ПРОФИЛЬ СОТРУДНИКА ====================
 function showEmployeeProfile(empId) {
     const emp = employees.find(e => e.id === empId);
     if (!emp) return;
@@ -379,15 +385,15 @@ function showEmployeeProfile(empId) {
     const content = document.getElementById('modalContent');
     content.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="color:#2d6a4f;">👤 ${getFullName(emp)}</h2>
+            <h2>👤 ${getFullName(emp)}</h2>
             <button class="close-modal">&times;</button>
         </div>
-        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px; padding:12px; background:#f0fdf4; border-radius:20px;">
+        <div style="background:#f0fdf4; padding:12px; border-radius:20px; margin-bottom:16px;">
             <div><strong>💰 Баланс:</strong> ${emp.points} ОКОИНОВ</div>
             <div><strong>⭐ Рейтинг:</strong> ${emp.rating} ${getLevelBadge(emp.rating)}</div>
             <div><strong>📧 Email:</strong> ${emp.email || 'не указан'}</div>
         </div>
-        <h3 style="margin-top:16px;">📜 История операций</h3>
+        <h3>📜 История операций</h3>
         ${empHistory.length === 0 ? '<p style="color:#888;">Нет операций</p>' : empHistory.map(h => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><small>${new Date(h.date).toLocaleString()}</small><br>${h.reason}: <strong>${h.delta > 0 ? '+' : ''}${h.delta}</strong></div>`).join('')}
         <h3 style="margin-top:16px;">🌟 Достижения</h3>
         ${empAchievements.length === 0 ? '<p style="color:#888;">Нет достижений</p>' : empAchievements.map(a => `<div style="padding:6px 0;"><small>${new Date(a.date).toLocaleString()}</small><br>✨ ${a.text}</div>`).join('')}
@@ -397,9 +403,8 @@ function showEmployeeProfile(empId) {
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 }
 
-// ==================== ЭКСПОРТ В EXCEL ====================
 function exportToExcel() {
-    const data = [['ID', 'Имя', 'Фамилия', 'Логин', 'Баланс (ОКОИНЫ)', 'Рейтинг', 'Email', 'Статус']];
+    const data = [['ID', 'Имя', 'Фамилия', 'Логин', 'Баланс', 'Рейтинг', 'Email', 'Статус']];
     employees.forEach(e => data.push([e.id, e.name, e.surname || '', e.login, e.points, e.rating, e.email || '', e.status]));
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -452,27 +457,25 @@ function renderDashboard() {
         dashboardChart = new Chart(ctx, {
             type: 'line',
             data: { labels: last7Days, datasets: [{ label: 'Начислено ОКОИНОВ', data: chartData, borderColor: '#2d6a4f', backgroundColor: 'rgba(45,106,79,0.1)', tension: 0.3, fill: true }] },
-            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' } } }
+            options: { responsive: true, maintainAspectRatio: true }
         });
     }
 }
 
-// ==================== НАСТРОЙКА УРОВНЕЙ ====================
 function renderLevelSettings() {
     const container = document.getElementById('levelSettingsContent');
     if (!container || !levelConfig) return;
     container.innerHTML = `
         <div class="card">
             <h3>⚙️ Настройка уровней рейтинга</h3>
-            <p style="color:#666; margin-bottom:16px;">Изменения применяются для всех пользователей</p>
             ${Object.entries(levelConfig).map(([key, lvl]) => `
-                <div style="margin-bottom:16px; padding:16px; background:#f8fafc; border-radius:20px;">
-                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-                        <input type="text" value="${lvl.name}" data-level="${key}" data-field="name" placeholder="Название" style="width:110px;">
-                        <input type="text" value="${lvl.emoji}" data-level="${key}" data-field="emoji" placeholder="Эмодзи" style="width:70px;">
-                        <input type="number" value="${lvl.min}" data-level="${key}" data-field="min" placeholder="Мин" style="width:80px;">
-                        <input type="number" value="${lvl.max}" data-level="${key}" data-field="max" placeholder="Макс" style="width:80px;">
-                        <select data-level="${key}" data-field="color" style="padding:8px; border-radius:60px;">
+                <div style="margin-bottom:16px; padding:12px; background:#f8fafc; border-radius:20px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                        <input type="text" value="${lvl.name}" data-level="${key}" data-field="name" style="width:110px;">
+                        <input type="text" value="${lvl.emoji}" data-level="${key}" data-field="emoji" style="width:70px;">
+                        <input type="number" value="${lvl.min}" data-level="${key}" data-field="min" style="width:80px;">
+                        <input type="number" value="${lvl.max}" data-level="${key}" data-field="max" style="width:80px;">
+                        <select data-level="${key}" data-field="color">
                             <option value="bronze" ${lvl.color==='bronze'?'selected':''}>Бронза</option>
                             <option value="silver" ${lvl.color==='silver'?'selected':''}>Серебро</option>
                             <option value="gold" ${lvl.color==='gold'?'selected':''}>Золото</option>
@@ -481,7 +484,7 @@ function renderLevelSettings() {
                     </div>
                 </div>
             `).join('')}
-            <button class="btn btn-primary" id="saveLevelsBtn">💾 Сохранить глобально</button>
+            <button class="btn btn-primary" id="saveLevelsBtn">💾 Сохранить</button>
         </div>
     `;
     document.querySelectorAll('[data-level]').forEach(el => {
@@ -496,7 +499,7 @@ function renderLevelSettings() {
             method: 'PATCH',
             body: JSON.stringify({ value: levelConfig })
         });
-        showToast('Настройки уровней сохранены для всех');
+        showToast('Настройки сохранены для всех');
         renderApp();
     });
 }
@@ -506,6 +509,7 @@ function setActiveTab(tab) { activeTab = tab; renderApp(); }
 
 function renderApp() {
     if (!currentUser) {
+        // Форма входа — появляется мгновенно
         document.getElementById('app').innerHTML = `
             <div class="login-container">
                 <div class="card" style="text-align:center;">
@@ -516,6 +520,27 @@ function renderApp() {
                     <div id="errorMsg" class="error"></div>
                 </div>
             </div>
+        `;
+        return;
+    }
+    
+    // Если данные ещё не загружены — показываем загрузку, но интерфейс уже есть
+    if (!dataLoaded) {
+        document.getElementById('app').innerHTML = `
+            <div class="container">
+                <div class="card flex">
+                    <h1>🏆 ОКОИНЫ</h1>
+                    <div class="flex">
+                        <div><strong>${getFullName(currentUser)}</strong> ⭐ ${currentUser.rating}</div>
+                        <button class="btn btn-secondary" onclick="doLogout()">Выйти</button>
+                    </div>
+                </div>
+                <div class="card" style="text-align:center; padding:40px;">
+                    <div style="display:inline-block; width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#2d6a4f; border-radius:50%; animation: spin 0.8s linear infinite;"></div>
+                    <p style="margin-top:16px;">Загрузка данных...</p>
+                </div>
+            </div>
+            <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
         `;
         return;
     }
@@ -531,7 +556,7 @@ function renderApp() {
                 <h1 style="background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent;">🏆 ОКОИНЫ</h1>
                 <div class="flex">
                     <div style="display:flex; align-items:center; gap:12px;">
-                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar" onerror="this.onerror=null;this.src='';">` : '<div class="avatar" style="display:flex; align-items:center; justify-content:center;">👤</div>'}
+                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar">` : '<div class="avatar" style="display:flex; align-items:center; justify-content:center;">👤</div>'}
                         <div><strong>${getFullName(currentUser)}</strong><br>⭐ ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
                     </div>
                     <div style="display:flex; gap:8px;">
@@ -545,7 +570,7 @@ function renderApp() {
                 <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">🏠 Главная</button>
                 ${isManager ? '<button class="tab-btn" data-tab="dashboard">📊 Дашборд</button>' : ''}
                 ${isManager ? '<button class="tab-btn" data-tab="users">👥 Управление</button>' : ''}
-                ${isManager ? '<button class="tab-btn" data-tab="prizes">🎁 Призы (CRUD)</button>' : ''}
+                ${isManager ? '<button class="tab-btn" data-tab="prizes">🎁 Призы</button>' : ''}
                 ${isManager ? '<button class="tab-btn" data-tab="levels">⚙️ Уровни</button>' : ''}
                 ${!isManager ? '<button class="tab-btn" data-tab="achievements">🌟 Достижения</button>' : ''}
                 ${!isManager ? '<button class="tab-btn" data-tab="history">📜 История</button>' : ''}
@@ -556,18 +581,18 @@ function renderApp() {
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="grid-2">
                     <div class="card">
-                        <h3>👥 Команда <span style="font-size:12px; font-weight:normal;">(нажмите для просмотра)</span></h3>
+                        <h3>👥 Команда <span style="font-size:12px;">(нажмите для просмотра)</span></h3>
                         ${activeEmployees.map(emp => `
                             <div class="employee-card" onclick="showEmployeeProfile(${emp.id})">
                                 <div style="display:flex; align-items:center; gap:12px;">
-                                    ${emp.photo ? `<img src="${emp.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.onerror=null;this.src='';">` : '<div style="width:40px;height:40px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;">👤</div>'}
+                                    ${emp.photo ? `<img src="${emp.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">` : '<div style="width:40px;height:40px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;">👤</div>'}
                                     <div><strong>${getFullName(emp)}</strong> ${getLevelBadge(emp.rating)}<br>💰 ${emp.points} ОКОИНОВ</div>
                                 </div>
                                 ${isManager ? `
                                     <div onclick="event.stopPropagation()" style="display:flex; gap:6px;">
                                         <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 5)">+5</button>
                                         <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 10)">+10</button>
-                                        <button class="btn btn-warning" onclick="let a=prompt('Сумма списания:'); if(a && !isNaN(a)) updatePoints(${emp.id}, -parseInt(a))">-</button>
+                                        <button class="btn btn-warning" onclick="let a=prompt('Сумма:'); if(a) updatePoints(${emp.id}, -parseInt(a))">-</button>
                                     </div>
                                 ` : ''}
                             </div>
@@ -576,8 +601,8 @@ function renderApp() {
                     </div>
                     <div class="card">
                         <h3>🎁 Призы</h3>
-                        ${prizes.map(p => `<div class="prize-card" onclick="showPrizeModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br>${(p.description || '').substring(0, 50)}${(p.description || '').length > 50 ? '...' : ''}</div><div><span class="level-badge level-gold">💰 ${p.cost} ОКОИНОВ</span></div></div>`).join('')}
-                        ${!isManager ? `<div style="margin-top:16px; background:#d1fae5; padding:12px; border-radius:20px;">🎯 Доступно призов: ${prizes.filter(p => p.cost <= currentUser.points).length}</div>` : ''}
+                        ${prizes.map(p => `<div class="prize-card" onclick="showPrizeModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br>${(p.description || '').substring(0, 50)}</div><div><span class="level-badge level-gold">💰 ${p.cost} ОКОИНОВ</span></div></div>`).join('')}
+                        ${!isManager ? `<div style="margin-top:16px; background:#d1fae5; padding:12px; border-radius:20px;">🎯 Доступно: ${prizes.filter(p => p.cost <= currentUser.points).length} призов</div>` : ''}
                     </div>
                 </div>
             </div>
@@ -593,7 +618,7 @@ function renderApp() {
                             <div><strong>${getFullName(u)}</strong> (${u.login})<br>💰 ${u.points} ОКОИНОВ | ⭐ ${u.rating}<br>📧 ${u.email || '-'}</div>
                             <div onclick="event.stopPropagation()" style="display:flex; gap:6px; flex-wrap:wrap;">
                                 <button class="btn btn-secondary" onclick="updateUserPoints(${u.id}, parseInt(prompt('Новый баланс:', ${u.points})))">💰 Баланс</button>
-                                <button class="btn btn-secondary" onclick="updateUserEmail(${u.id}, prompt('Новый email:'))">✉️ Email</button>
+                                <button class="btn btn-secondary" onclick="updateUserEmail(${u.id}, prompt('Email:'))">✉️ Email</button>
                                 <button class="btn btn-warning" onclick="resetUserPassword(${u.id})">🔑 Сброс пароля</button>
                                 <button class="btn btn-danger" onclick="archiveUser(${u.id})">${u.status === 'archived' ? '🔄 Восстановить' : '📦 Архив'}</button>
                             </div>
@@ -623,14 +648,11 @@ function renderApp() {
             <div id="tab-achievements" class="tab ${activeTab === 'achievements' ? 'active' : ''}">
                 <div class="card">
                     <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn btn-primary" id="addAchievementBtn">➕ Добавить</button></div>
-                    ${myAchievements.length === 0 ? '<p style="text-align:center; color:#888; padding:20px;">Пока нет достижений. Добавьте первое!</p>' : 
+                    ${myAchievements.length === 0 ? '<p style="text-align:center; color:#888; padding:20px;">Нет достижений</p>' : 
                         myAchievements.map(a => `
                             <div class="achievement-item">
-                                <div><small>${new Date(a.date).toLocaleString()}</small><div style="margin-top:4px;">✨ ${a.text}</div></div>
-                                <div style="display:flex; gap:6px;">
-                                    <button class="btn btn-secondary" onclick="editAchievement(${a.id}, prompt('Новый текст:', '${a.text.replace(/'/g, "\\'")}'))">✏️</button>
-                                    <button class="btn btn-danger" onclick="deleteAchievement(${a.id})">🗑️</button>
-                                </div>
+                                <div><small>${new Date(a.date).toLocaleString()}</small><div>✨ ${a.text}</div></div>
+                                <div><button class="btn btn-secondary" onclick="editAchievement(${a.id}, prompt('Новый текст:', '${a.text.replace(/'/g, "\\'")}'))">✏️</button> <button class="btn btn-danger" onclick="deleteAchievement(${a.id})">🗑️</button></div>
                             </div>
                         `).join('')
                     }
@@ -640,11 +662,11 @@ function renderApp() {
             <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
                 <div class="card">
                     <h3>📜 История операций</h3>
-                    ${myHistory.length === 0 ? '<p style="text-align:center; color:#888; padding:20px;">Нет операций. Менеджер ещё не начислял баллы.</p>' :
+                    ${myHistory.length === 0 ? '<p style="text-align:center; color:#888; padding:20px;">Нет операций</p>' :
                         myHistory.map(h => `
                             <div style="padding:10px 0; border-bottom:1px solid #eee;">
-                                <small style="color:#666;">${new Date(h.date).toLocaleString()}</small><br>
-                                <strong>${h.reason}</strong>: <span style="color:${h.delta > 0 ? '#2d6a4f' : '#dc2626'}; font-weight:600;">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ
+                                <small>${new Date(h.date).toLocaleString()}</small><br>
+                                <strong>${h.reason}</strong>: ${h.delta > 0 ? '+' : ''}${h.delta} ОКОИНОВ
                             </div>
                         `).join('')
                     }
@@ -656,17 +678,17 @@ function renderApp() {
                 <div class="card">
                     <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:center;">
                         <div style="text-align:center;">
-                            ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar-large" onerror="this.onerror=null;this.src='';">` : '<div class="avatar-large" style="display:flex; align-items:center; justify-content:center; background:#e2e8f0; font-size:48px;">👤</div>'}
+                            ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar-large">` : '<div class="avatar-large" style="display:flex; align-items:center; justify-content:center; background:#e2e8f0; font-size:48px;">👤</div>'}
                             <div style="margin-top:12px;">
-                                <label class="btn btn-secondary" style="cursor:pointer; display:inline-block;">📷 Загрузить фото
+                                <label class="btn btn-secondary" style="cursor:pointer;">📷 Загрузить фото
                                     <input type="file" id="profilePhotoInput" accept="image/jpeg,image/png" style="display:none;">
                                 </label>
                             </div>
                         </div>
                         <div style="flex:1;">
-                            <div style="margin-bottom:12px;"><strong>ФИО:</strong> ${getFullName(currentUser)}</div>
-                            <div style="margin-bottom:12px;"><strong>⭐ Рейтинг:</strong> ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
-                            <div style="margin-bottom:12px;"><strong>💰 Баланс:</strong> ${currentUser.points} ОКОИНОВ</div>
+                            <div><strong>ФИО:</strong> ${getFullName(currentUser)}</div>
+                            <div><strong>⭐ Рейтинг:</strong> ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
+                            <div><strong>💰 Баланс:</strong> ${currentUser.points} ОКОИНОВ</div>
                             <div><strong>✉️ Email:</strong> ${currentUser.email || 'не указан'} <button class="btn btn-secondary" id="changeEmailBtn" style="margin-left:8px;">Изменить</button></div>
                         </div>
                     </div>
@@ -678,7 +700,6 @@ function renderApp() {
     
     document.getElementById('app').innerHTML = html;
     
-    // Обработчики событий
     document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
     document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
         const old = prompt('Старый пароль:'); const newp = prompt('Новый пароль (мин 8, заглавная, цифра, спецсимвол):');
@@ -705,10 +726,9 @@ function renderApp() {
             if (name && surname && login && password) addUser(name, surname, login, password, points);
         });
         document.getElementById('addPrizeBtn')?.addEventListener('click', () => {
-            const name = prompt('Название приза'); const cost = prompt('Стоимость в ОКОИНАХ');
-            const desc = prompt('Описание (можно с переносами)'); const conditions = prompt('Условия (можно с переносами)');
-            const img = prompt('URL фото (необязательно)');
-            if (name && cost) addPrize(name, cost, desc || '', conditions || '', img || '');
+            const name = prompt('Название'); const cost = prompt('Стоимость'); const desc = prompt('Описание');
+            const cond = prompt('Условия'); const img = prompt('URL фото');
+            if (name && cost) addPrize(name, cost, desc || '', cond || '', img || '');
         });
         document.getElementById('exportExcelBtn')?.addEventListener('click', exportToExcel);
         if (activeTab === 'dashboard') renderDashboard();
@@ -721,13 +741,14 @@ const savedUser = localStorage.getItem('oko_current_user');
 if (savedUser) {
     try {
         currentUser = JSON.parse(savedUser);
-        loadAllData().then(() => renderApp());
+        renderApp(); // Сразу показываем интерфейс
+        loadAllData(); // Грузим данные в фоне
     } catch(e) { renderApp(); }
 } else {
-    renderApp();
+    renderApp(); // Показываем форму входа
 }
 
-// Глобальные функции для onclick
+// Глобальные функции
 window.doLogin = doLogin;
 window.updatePoints = updatePoints;
 window.archiveUser = archiveUser;
