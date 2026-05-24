@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ОКОИНЫ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; padding: 20px; }
@@ -38,9 +39,6 @@
         .level-silver { background: #94a3b8; color: white; }
         .level-gold { background: #fbbf24; color: #1e293b; }
         .level-platinum { background: #c084fc; color: white; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
-        .avatar-large { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; }
-        .profile-photo { text-align: center; }
         .available-prize { background: #d1fae5; border: 1px solid #2d6a4f; }
         .badge-available { background: #2d6a4f; color: white; padding: 2px 8px; border-radius: 60px; font-size: 10px; margin-left: 8px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
@@ -48,6 +46,12 @@
         .close-modal { float: right; font-size: 24px; cursor: pointer; }
         .prizes-section { margin-bottom: 20px; }
         .prizes-section h4 { margin-bottom: 10px; padding-bottom: 5px; border-bottom: 2px solid #2d6a4f; display: inline-block; }
+        .stats-row { display: flex; gap: 20px; flex-wrap: wrap; }
+        .stat-item { background: #f0fdf4; border-radius: 20px; padding: 12px 20px; text-align: center; flex: 1; }
+        .stat-label { font-size: 12px; color: #666; }
+        .stat-value { font-size: 24px; font-weight: 800; color: #2d6a4f; }
+        .log-row { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .log-employee { font-weight: 600; color: #2d6a4f; }
     </style>
 </head>
 <body>
@@ -96,11 +100,11 @@ async function loadPrizes() {
     if (data) prizes = data;
 }
 async function loadAchievements() {
-    const data = await api(`${SUPABASE_URL}/rest/v1/achievements`);
+    const data = await api(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
     if (data) achievements = data;
 }
 async function loadHistory() {
-    const data = await api(`${SUPABASE_URL}/rest/v1/history`);
+    const data = await api(`${SUPABASE_URL}/rest/v1/history?order=date.desc`);
     if (data) history = data;
 }
 async function loadAllData() {
@@ -130,53 +134,33 @@ async function login() {
 }
 function logout() { currentUser = null; localStorage.removeItem('user'); renderLogin(); }
 
-// ========== ФОТО ==========
-async function uploadPhoto(file) {
-    if (!file || !file.type.startsWith('image/')) {
-        alert('Выберите изображение');
-        return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-        alert('Файл не более 2 МБ');
-        return;
-    }
-    const fileName = `${currentUser.id}_${Date.now()}.${file.name.split('.').pop()}`;
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/avatars/${fileName}`;
-    await fetch(uploadUrl, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
-        body: file
-    });
-    const photoUrl = `${SUPABASE_URL}/storage/v1/object/public/avatars/${fileName}`;
-    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${currentUser.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ photo: photoUrl })
-    });
-    currentUser.photo = photoUrl;
-    await loadEmployees();
-    renderMain();
-    alert('Фото обновлено');
-}
-
 // ========== БАЛЛЫ ==========
 async function addPoints(empId, delta) {
     const emp = employees.find(e => e.id === empId);
     if (!emp) return;
     const reason = prompt('Причина:', delta > 0 ? 'Бонус' : 'Замечание');
     if (!reason) return;
+    
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
+    
     await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
+    
     await api(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         body: JSON.stringify({ user_id: empId, reason, delta })
     });
+    
     emp.points = newPoints;
     emp.rating = newRating;
-    if (currentUser.id === empId) { currentUser.points = newPoints; currentUser.rating = newRating; }
+    if (currentUser.id === empId) { 
+        currentUser.points = newPoints; 
+        currentUser.rating = newRating; 
+    }
+    
     await loadHistory();
     renderMain();
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
@@ -194,7 +178,7 @@ async function addEmployee() {
         method: 'POST',
         body: JSON.stringify({
             name, surname, login, password, role: 'employee',
-            points, rating: points, photo: '', email: '', status: 'active'
+            points, rating: points, photo: '', status: 'active'
         })
     });
     await loadEmployees();
@@ -234,14 +218,15 @@ function showEmployeeProfile(empId) {
     if (!emp) return;
     const empAchievements = achievements.filter(a => a.user_id === empId);
     const empHistory = history.filter(h => h.user_id === empId).slice(0, 30);
+    const totalEarned = empHistory.filter(h => h.delta > 0).reduce((s, h) => s + h.delta, 0);
     const modal = document.getElementById('prizeModal');
     const content = document.getElementById('modalContent');
     content.innerHTML = `
         <div><button class="close-modal">&times;</button><h2>👤 ${emp.name} ${emp.surname || ''}</h2></div>
         <div class="flex" style="margin:15px 0; padding:10px; background:#f0fdf4; border-radius:20px;">
-            <div>⭐ ${emp.rating} ${getLevel(emp.rating).emoji} ${getLevel(emp.rating).name}</div>
-            <div>💰 ${emp.points} ОКОИНОВ</div>
-            <div>✉️ ${emp.email || 'не указан'}</div>
+            <div>⭐ Рейтинг: ${emp.rating} ${getLevel(emp.rating).emoji} ${getLevel(emp.rating).name}</div>
+            <div>💰 Баланс: ${emp.points} ОКОИНОВ</div>
+            <div>📊 Всего заработано: ${totalEarned} ОКОИНОВ</div>
             <div>🔑 Логин: ${emp.login}</div>
         </div>
         <h3>🌟 Достижения</h3>
@@ -263,7 +248,7 @@ async function addAchievement() {
         body: JSON.stringify({ user_id: currentUser.id, text })
     });
     await loadAchievements();
-    renderMain();
+    refreshAchievementsList();
     alert('Достижение добавлено');
 }
 
@@ -275,7 +260,7 @@ async function editAchievement(id, oldText) {
         body: JSON.stringify({ text: newText })
     });
     await loadAchievements();
-    renderMain();
+    refreshAchievementsList();
     alert('Достижение обновлено');
 }
 
@@ -283,10 +268,30 @@ async function deleteAchievement(id) {
     if (!confirm('Удалить достижение?')) return;
     await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
     await loadAchievements();
-    renderMain();
+    refreshAchievementsList();
+    alert('Достижение удалено');
 }
 
-// ========== ПРИЗЫ ==========
+function refreshAchievementsList() {
+    const container = document.getElementById('achievementsListContainer');
+    if (!container) return;
+    const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
+    if (myAchievements.length === 0) {
+        container.innerHTML = '<p class="loading">Нет достижений. Добавьте первое!</p>';
+        return;
+    }
+    container.innerHTML = myAchievements.map(a => `
+        <div class="achievement-item">
+            <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
+            <div>
+                <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
+                <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ========== ПРИЗЫ (С ИСПРАВЛЕННЫМ РЕДАКТИРОВАНИЕМ) ==========
 async function addPrize() {
     const name = prompt('Название приза');
     const cost = parseInt(prompt('Стоимость в ОКОИНАХ'));
@@ -302,12 +307,17 @@ async function addPrize() {
     alert(`Приз "${name}" добавлен`);
 }
 
-async function editPrize(id, oldName, oldCost, oldDesc, oldConditions) {
-    const name = prompt('Название', oldName);
-    const cost = parseInt(prompt('Стоимость', oldCost));
-    const desc = prompt('Описание', oldDesc || '');
-    const conditions = prompt('Условия получения', oldConditions || '');
-    if (!name || !cost) return;
+async function editPrize(id) {
+    const prize = prizes.find(p => p.id === id);
+    if (!prize) return;
+    
+    const name = prompt('Название', prize.name);
+    if (!name) return;
+    const cost = parseInt(prompt('Стоимость', prize.cost));
+    if (!cost) return;
+    const desc = prompt('Описание', prize.description || '');
+    const conditions = prompt('Условия получения', prize.conditions || '');
+    
     await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name, cost, description: desc, conditions })
@@ -347,21 +357,10 @@ async function changePassword() {
     alert('Пароль изменён');
 }
 
-async function updateEmail() {
-    const newEmail = prompt('Новый email:', currentUser.email || '');
-    if (newEmail === null) return;
-    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${currentUser.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ email: newEmail })
-    });
-    currentUser.email = newEmail;
-    alert('Email обновлён');
-}
-
 // ========== ЭКСПОРТ В EXCEL ==========
 function exportToExcel() {
-    const data = [['ID', 'Имя', 'Фамилия', 'Логин', 'Баланс', 'Рейтинг', 'Email', 'Статус']];
-    employees.forEach(e => data.push([e.id, e.name, e.surname || '', e.login, e.points, e.rating, e.email || '', e.status]));
+    const data = [['ID', 'Имя', 'Фамилия', 'Логин', 'Баланс', 'Рейтинг', 'Статус']];
+    employees.forEach(e => data.push([e.id, e.name, e.surname || '', e.login, e.points, e.rating, e.status]));
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Сотрудники');
@@ -396,13 +395,13 @@ function renderDashboard() {
     container.innerHTML = `
         <div class="stats-grid">
             <div class="stat-card"><div>👥</div><div class="stat-number">${activeEmps.length}</div><div>Сотрудников</div></div>
-            <div class="stat-card"><div>💰</div><div class="stat-number">${totalPoints}</div><div>Всего ОКОИНОВ</div></div>
+            <div class="stat-card"><div>💰</div><div class="stat-number">${totalPoints}</div><div>Всего ОКОИНОВ на балансе</div></div>
             <div class="stat-card"><div>⭐</div><div class="stat-number">${totalRating}</div><div>Рейтинг</div></div>
             <div class="stat-card"><div>📊</div><div class="stat-number">${avgRating}</div><div>Средний рейтинг</div></div>
         </div>
         <div class="chart-container"><canvas id="dashboardCanvas"></canvas></div>
-        <h4 style="margin-top:20px;">🏆 Топ-5 сотрудников</h4>
-        ${topEmployees.map((e,i) => `<div class="flex" style="padding:8px 0; border-bottom:1px solid #eee;"><span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} ${e.name} ${e.surname || ''}</span><span class="level-badge ${getLevel(e.rating).class}">⭐ ${e.rating}</span></div>`).join('')}
+        <h4 style="margin-top:20px;">🏆 Топ-5 сотрудников по рейтингу</h4>
+        ${topEmployees.map((e,i) => `<div class="flex" style="padding:8px 0; border-bottom:1px solid #eee;"><span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} ${e.name} ${e.surname || ''}</span><span class="level-badge ${getLevel(e.rating).class}">⭐ ${e.rating}</span><span>💰 ${e.points}</span></div>`).join('')}
     `;
     const ctx = document.getElementById('dashboardCanvas')?.getContext('2d');
     if (ctx) {
@@ -438,33 +437,50 @@ function renderMain() {
     const isManager = currentUser?.role === 'manager';
     const activeEmployees = employees.filter(e => e.status !== 'archived');
     const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
-    const myHistory = history.filter(h => h.user_id === currentUser.id).slice(0, 30);
+    const myHistory = history.filter(h => h.user_id === currentUser.id).slice(0, 50);
+    const totalEarned = myHistory.filter(h => h.delta > 0).reduce((s, h) => s + h.delta, 0);
     const isLoading = !dataReady;
     const level = getLevel(currentUser.rating);
     
-    // Разделяем призы на доступные и недоступные для сотрудника
     const availablePrizes = prizes.filter(p => p.cost <= currentUser.points);
     const unavailablePrizes = prizes.filter(p => p.cost > currentUser.points);
+    
+    // Для менеджера: все операции по всем сотрудникам
+    const allHistory = isManager ? history : [];
+    const allAchievements = isManager ? achievements : [];
     
     const html = `
         <div style="max-width: 1200px; margin: 0 auto;">
             <div class="card flex">
+                <h1>🏆 ОКОИНЫ</h1>
                 <div class="flex">
-                    <div class="profile-photo">
-                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar-large">` : '<div class="avatar-large" style="background:#e2e8f0; display:flex; align-items:center; justify-content:center;">👤</div>'}
-                        <label class="btn btn-secondary btn-small" style="cursor:pointer; display:block; margin-top:5px;">📷 Фото<input type="file" id="photoInput" accept="image/*" style="display:none;"></label>
-                    </div>
-                    <div><h1>🏆 ОКОИНЫ</h1></div>
-                </div>
-                <div class="flex">
-                    <div><strong>${currentUser.name}</strong> ⭐ ${currentUser.rating} <span class="level-badge ${level.class}">${level.emoji} ${level.name}</span><br>💰 ${currentUser.points} ОКОИНОВ<br>✉️ ${currentUser.email || 'email не указан'}</div>
+                    <div><strong>${currentUser.name}</strong> ⭐ ${currentUser.rating} <span class="level-badge ${level.class}">${level.emoji} ${level.name}</span><br>💰 ${currentUser.points} ОКОИНОВ</div>
                     <div class="flex">
                         <button class="btn btn-secondary btn-small" onclick="logout()">Выйти</button>
                         <button class="btn btn-secondary btn-small" onclick="changePassword()">Сменить пароль</button>
-                        <button class="btn btn-secondary btn-small" onclick="updateEmail()">✉️ Email</button>
                     </div>
                 </div>
             </div>
+            
+            <!-- Статистика для сотрудника -->
+            ${!isManager ? `
+            <div class="card">
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <div class="stat-label">🏆 Всего заработано</div>
+                        <div class="stat-value">${totalEarned} ОКОИНОВ</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">💰 Текущий баланс</div>
+                        <div class="stat-value">${currentUser.points} ОКОИНОВ</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">⭐ Рейтинг</div>
+                        <div class="stat-value">${currentUser.rating}</div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
             
             <div class="tab-buttons">
                 <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">👥 Команда</button>
@@ -473,19 +489,20 @@ function renderMain() {
                 <button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" data-tab="history">📜 История</button>
                 ${isManager ? '<button class="tab-btn" data-tab="dashboard">📊 Дашборд</button>' : ''}
                 ${isManager ? '<button class="tab-btn" data-tab="manage">⚙️ Управление</button>' : ''}
+                ${isManager ? '<button class="tab-btn" data-tab="allhistory">📋 Все операции</button>' : ''}
+                ${isManager ? '<button class="tab-btn" data-tab="allachievements">🏅 Все достижения</button>' : ''}
             </div>
             
             <!-- Команда -->
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="card">
-                    <h3>👥 Команда <span style="font-size:12px;">(нажмите для просмотра достижений)</span></h3>
+                    <h3>👥 Команда <span style="font-size:12px;">(нажмите для просмотра деталей)</span></h3>
                     ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
                     ${!isLoading && activeEmployees.map(emp => {
                         const empLevel = getLevel(emp.rating);
                         return `
                         <div class="employee" onclick="showEmployeeProfile(${emp.id})">
                             <div class="flex" style="gap:10px;">
-                                ${emp.photo ? `<img src="${emp.photo}" class="avatar">` : '<div class="avatar" style="background:#e2e8f0; display:flex; align-items:center; justify-content:center;">👤</div>'}
                                 <div><strong>${emp.name} ${emp.surname || ''}</strong> <span class="level-badge ${empLevel.class}">${empLevel.emoji} ${empLevel.name}</span><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
                             </div>
                             ${isManager ? `
@@ -502,7 +519,7 @@ function renderMain() {
                 </div>
             </div>
             
-            <!-- Призы (для сотрудника разделены на доступные и недоступные) -->
+            <!-- Призы -->
             <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
                 <div class="card">
                     <h3>🎁 Призы</h3>
@@ -528,9 +545,12 @@ function renderMain() {
                         </div>
                     ` : `
                         ${prizes.map(p => `
-                            <div class="prize-item" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                                <div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div>
-                                <div>💰 ${p.cost} ОКОИНОВ</div>
+                            <div class="prize-item">
+                                <div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span><br>💰 ${p.cost} ОКОИНОВ</div>
+                                <div>
+                                    <button class="btn btn-secondary btn-small" onclick="editPrize(${p.id})">✏️</button>
+                                    <button class="btn btn-danger btn-small" onclick="deletePrize(${p.id})">🗑️</button>
+                                </div>
                             </div>
                         `).join('')}
                         ${prizes.length === 0 ? '<p>Нет призов</p>' : ''}
@@ -538,28 +558,30 @@ function renderMain() {
                 </div>
             </div>
             
-            <!-- Достижения -->
+            <!-- Достижения сотрудника -->
             <div id="tab-achievements" class="tab ${activeTab === 'achievements' ? 'active' : ''}">
                 <div class="card">
                     <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn" onclick="addAchievement()">➕ Добавить</button></div>
-                    ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
-                    ${!isLoading && myAchievements.map(a => `
-                        <div class="achievement-item">
-                            <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
-                            <div>
-                                <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
-                                <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
+                    <div id="achievementsListContainer">
+                        ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
+                        ${!isLoading && myAchievements.length === 0 ? '<p class="loading">Нет достижений. Добавьте первое!</p>' : ''}
+                        ${!isLoading && myAchievements.map(a => `
+                            <div class="achievement-item">
+                                <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
+                                <div>
+                                    <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
+                                    <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
-                    ${!isLoading && myAchievements.length === 0 ? '<p class="loading">Нет достижений. Добавьте первое!</p>' : ''}
+                        `).join('')}
+                    </div>
                 </div>
             </div>
             
-            <!-- История -->
+            <!-- История сотрудника -->
             <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
                 <div class="card">
-                    <h3>📜 История операций</h3>
+                    <h3>📜 Моя история операций</h3>
                     ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
                     ${!isLoading && myHistory.map(h => `
                         <div class="history-item">
@@ -585,7 +607,7 @@ function renderMain() {
                         <div class="prize-item">
                             <div><strong>${p.name}</strong><br>💰 ${p.cost} ОКОИНОВ</div>
                             <div>
-                                <button class="btn btn-secondary btn-small" onclick="editPrize(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.cost}, '${(p.description || '').replace(/'/g, "\\'")}', '${(p.conditions || '').replace(/'/g, "\\'")}')">✏️</button>
+                                <button class="btn btn-secondary btn-small" onclick="editPrize(${p.id})">✏️</button>
                                 <button class="btn btn-danger btn-small" onclick="deletePrize(${p.id})">🗑️ Удалить</button>
                             </div>
                         </div>
@@ -599,13 +621,47 @@ function renderMain() {
                             <div>
                                 <button class="btn btn-secondary btn-small" onclick="editEmployee(${emp.id}, '${emp.name.replace(/'/g, "\\'")}', '${(emp.surname || '').replace(/'/g, "\\'")}', '${emp.login.replace(/'/g, "\\'")}')">✏️ Редактировать</button>
                                 <button class="btn btn-secondary btn-small" onclick="updateUserPoints(${emp.id}, parseInt(prompt('Новый баланс:', ${emp.points})))">💰 Баланс</button>
-                                <button class="btn btn-secondary btn-small" onclick="updateUserEmail(${emp.id}, prompt('Новый email:', '${emp.email || ''}'))">✉️ Email</button>
                                 <button class="btn btn-warning btn-small" onclick="resetUserPassword(${emp.id})">🔄 Сброс пароля</button>
                             </div>
                         </div>
                     `).join('')}
                     <hr style="margin: 20px 0;">
                     <div class="flex"><h3>📎 Экспорт данных</h3><button class="btn" onclick="exportToExcel()">📊 Экспорт в Excel</button></div>
+                </div>
+            </div>
+            
+            <!-- Все операции по всем сотрудникам -->
+            <div id="tab-allhistory" class="tab ${activeTab === 'allhistory' ? 'active' : ''}">
+                <div class="card">
+                    <h3>📋 Все операции начислений и списаний</h3>
+                    ${allHistory.map(h => {
+                        const emp = employees.find(e => e.id === h.user_id);
+                        return `
+                            <div class="log-row">
+                                <span class="history-date">${new Date(h.date).toLocaleString()}</span><br>
+                                <span class="log-employee">${emp ? emp.name : 'Неизвестный'}</span>: ${h.reason} — 
+                                <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ
+                            </div>
+                        `;
+                    }).join('')}
+                    ${allHistory.length === 0 ? '<p class="loading">Нет операций</p>' : ''}
+                </div>
+            </div>
+            
+            <!-- Все достижения по всем сотрудникам -->
+            <div id="tab-allachievements" class="tab ${activeTab === 'allachievements' ? 'active' : ''}">
+                <div class="card">
+                    <h3>🏅 Все достижения сотрудников</h3>
+                    ${allAchievements.map(a => {
+                        const emp = employees.find(e => e.id === a.user_id);
+                        return `
+                            <div class="log-row">
+                                <span class="history-date">${new Date(a.date).toLocaleString()}</span><br>
+                                <span class="log-employee">${emp ? emp.name : 'Неизвестный'}</span>: ✨ ${a.text}
+                            </div>
+                        `;
+                    }).join('')}
+                    ${allAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : ''}
                 </div>
             </div>
             ` : ''}
@@ -618,13 +674,6 @@ function renderMain() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
-    
-    const photoInput = document.getElementById('photoInput');
-    if (photoInput) {
-        photoInput.addEventListener('change', (e) => {
-            if (e.target.files[0]) uploadPhoto(e.target.files[0]);
-        });
-    }
     
     if (isManager && activeTab === 'dashboard' && dataReady) {
         renderDashboard();
@@ -641,17 +690,6 @@ async function updateUserPoints(id, newPoints) {
     await loadEmployees();
     renderMain();
     alert('Баланс обновлён');
-}
-
-async function updateUserEmail(id, email) {
-    if (!email) return;
-    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ email })
-    });
-    await loadEmployees();
-    renderMain();
-    alert('Email обновлён');
 }
 
 // ЗАПУСК
@@ -676,16 +714,13 @@ window.editPrize = editPrize;
 window.deletePrize = deletePrize;
 window.showPrizeInfo = showPrizeInfo;
 window.changePassword = changePassword;
-window.updateEmail = updateEmail;
 window.addAchievement = addAchievement;
 window.editAchievement = editAchievement;
 window.deleteAchievement = deleteAchievement;
 window.resetUserPassword = resetUserPassword;
 window.exportToExcel = exportToExcel;
-window.uploadPhoto = uploadPhoto;
 window.showEmployeeProfile = showEmployeeProfile;
 window.updateUserPoints = updateUserPoints;
-window.updateUserEmail = updateUserEmail;
 </script>
 </body>
 </html>
