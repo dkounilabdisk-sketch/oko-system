@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ОКОИНЫ — мотивация сотрудников</title>
+    <title>ОКОИНЫ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -27,6 +27,8 @@
         .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; font-size: 14px; }
         .tab-btn.active { background: #2d6a4f; color: white; }
         .loading { text-align: center; padding: 20px; color: #666; }
+        .loader { display: inline-block; width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #2d6a4f; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .history-date { font-size: 11px; color: #666; }
         .history-delta-plus { color: #2d6a4f; font-weight: 600; }
         .history-delta-minus { color: #dc2626; font-weight: 600; }
@@ -69,6 +71,12 @@ let history = [];
 let activeTab = 'main';
 let dataReady = false;
 let dashboardChart = null;
+let loadingPromises = {
+    employees: false,
+    prizes: false,
+    achievements: false,
+    history: false
+};
 
 function getLevel(rating) {
     if (rating >= 500) return { name: 'Платина', emoji: '💎', class: 'level-platinum' };
@@ -99,28 +107,40 @@ async function api(url, options = {}) {
     }
 }
 
-// ========== ЗАГРУЗКА ДАННЫХ ==========
+// ========== ЗАГРУЗКА ДАННЫХ (ПО ОТДЕЛЬНОСТИ) ==========
 async function loadEmployees() {
+    if (loadingPromises.employees) return employees;
+    loadingPromises.employees = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
     if (data) employees = data;
-    return data;
+    renderMain();
+    return employees;
 }
 async function loadPrizes() {
+    if (loadingPromises.prizes) return prizes;
+    loadingPromises.prizes = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/prizes`);
     if (data) prizes = data;
-    return data;
+    renderMain();
+    return prizes;
 }
 async function loadAchievements() {
+    if (loadingPromises.achievements) return achievements;
+    loadingPromises.achievements = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
     if (data) achievements = data;
-    return data;
+    renderMain();
+    return achievements;
 }
 async function loadHistory() {
+    if (loadingPromises.history) return history;
+    loadingPromises.history = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/history?order=date.desc`);
     if (data) history = data;
-    console.log('Загружено записей истории:', data?.length || 0);
-    return data;
+    renderMain();
+    return history;
 }
+
 async function loadAllData() {
     await Promise.all([loadEmployees(), loadPrizes(), loadAchievements(), loadHistory()]);
     dataReady = true;
@@ -139,8 +159,10 @@ async function login() {
         if (data && data.length > 0) {
             currentUser = data[0];
             localStorage.setItem('user', JSON.stringify(currentUser));
-            await loadAllData();
+            // Показываем интерфейс сразу
             renderMain();
+            // Загружаем данные в фоне
+            loadAllData();
         } else {
             errDiv.innerText = 'Неверный логин или пароль';
         }
@@ -148,7 +170,7 @@ async function login() {
 }
 function logout() { currentUser = null; localStorage.removeItem('user'); renderLogin(); }
 
-// ========== БАЛЛЫ (ИСПРАВЛЕНО) ==========
+// ========== БАЛЛЫ ==========
 async function addPoints(empId, delta) {
     const emp = employees.find(e => e.id === empId);
     if (!emp) {
@@ -163,7 +185,7 @@ async function addPoints(empId, delta) {
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
     
     // 1. Обновляем пользователя
-    const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -173,34 +195,16 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
-    if (!updateResponse.ok) {
-        alert('Ошибка обновления баланса');
-        return;
-    }
-    
     // 2. Добавляем запись в историю
-    const historyResponse = await fetch(`${SUPABASE_URL}/rest/v1/history`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ 
-            user_id: empId, 
-            reason: reason, 
-            delta: delta 
-        })
+        body: JSON.stringify({ user_id: empId, reason, delta })
     });
-    
-    if (!historyResponse.ok) {
-        const errorText = await historyResponse.text();
-        console.error('Ошибка истории:', errorText);
-        alert('Ошибка сохранения истории: ' + historyResponse.status);
-        return;
-    }
-    
-    console.log('✅ История сохранена, статус:', historyResponse.status);
     
     // 3. Обновляем локальные данные
     emp.points = newPoints;
@@ -210,10 +214,10 @@ async function addPoints(empId, delta) {
         currentUser.rating = newRating; 
     }
     
-    // 4. Принудительно перезагружаем историю
-    await loadHistory();
+    // 4. Перезагружаем историю
+    loadingPromises.history = false;
+    loadHistory();
     
-    // 5. Обновляем интерфейс
     renderMain();
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
 }
@@ -227,7 +231,7 @@ async function addEmployee() {
     const points = parseInt(prompt('Начальные баллы', 0));
     if (!name || !surname || !login || !password) return;
     
-    const result = await api(`${SUPABASE_URL}/rest/v1/users`, {
+    await api(`${SUPABASE_URL}/rest/v1/users`, {
         method: 'POST',
         body: JSON.stringify({
             name, surname, login, password, role: 'employee',
@@ -235,13 +239,8 @@ async function addEmployee() {
         })
     });
     
-    if (result === null) {
-        alert('Ошибка добавления сотрудника');
-        return;
-    }
-    
-    await loadEmployees();
-    renderMain();
+    loadingPromises.employees = false;
+    loadEmployees();
     alert('Сотрудник добавлен');
 }
 
@@ -256,8 +255,8 @@ async function editEmployee(empId, oldName, oldSurname, oldLogin) {
         method: 'PATCH',
         body: JSON.stringify({ name: newName, surname: newSurname, login: newLogin })
     });
-    await loadEmployees();
-    renderMain();
+    loadingPromises.employees = false;
+    loadEmployees();
     alert('Данные сотрудника обновлены');
 }
 
@@ -305,8 +304,8 @@ async function addAchievement() {
         method: 'POST',
         body: JSON.stringify({ user_id: currentUser.id, text })
     });
-    await loadAchievements();
-    refreshAchievementsList();
+    loadingPromises.achievements = false;
+    loadAchievements();
     alert('Достижение добавлено');
 }
 
@@ -317,36 +316,17 @@ async function editAchievement(id, oldText) {
         method: 'PATCH',
         body: JSON.stringify({ text: newText })
     });
-    await loadAchievements();
-    refreshAchievementsList();
+    loadingPromises.achievements = false;
+    loadAchievements();
     alert('Достижение обновлено');
 }
 
 async function deleteAchievement(id) {
     if (!confirm('Удалить достижение?')) return;
     await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
-    await loadAchievements();
-    refreshAchievementsList();
+    loadingPromises.achievements = false;
+    loadAchievements();
     alert('Достижение удалено');
-}
-
-function refreshAchievementsList() {
-    const container = document.getElementById('achievementsListContainer');
-    if (!container) return;
-    const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
-    if (myAchievements.length === 0) {
-        container.innerHTML = '<p class="loading">Нет достижений. Добавьте первое!</p>';
-        return;
-    }
-    container.innerHTML = myAchievements.map(a => `
-        <div class="achievement-item">
-            <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
-            <div>
-                <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
-                <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
-            </div>
-        </div>
-    `).join('');
 }
 
 // ========== ПРИЗЫ ==========
@@ -360,8 +340,8 @@ async function addPrize() {
         method: 'POST',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    await loadPrizes();
-    renderMain();
+    loadingPromises.prizes = false;
+    loadPrizes();
     alert(`Приз "${name}" добавлен`);
 }
 
@@ -380,16 +360,16 @@ async function editPrize(id) {
         method: 'PATCH',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    await loadPrizes();
-    renderMain();
+    loadingPromises.prizes = false;
+    loadPrizes();
     alert('Приз обновлён');
 }
 
 async function deletePrize(id) {
     if (!confirm('Удалить приз?')) return;
     await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
-    await loadPrizes();
-    renderMain();
+    loadingPromises.prizes = false;
+    loadPrizes();
     alert('Приз удалён');
 }
 
@@ -529,8 +509,12 @@ function renderMain() {
     const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
     const myHistory = history.filter(h => h.user_id === currentUser.id).slice(0, 50);
     const totalEarned = myHistory.filter(h => h.delta > 0).reduce((s, h) => s + h.delta, 0);
-    const isLoading = !dataReady;
     const level = getLevel(currentUser.rating);
+    
+    const isLoadingEmployees = !loadingPromises.employees && employees.length === 0;
+    const isLoadingPrizes = !loadingPromises.prizes && prizes.length === 0;
+    const isLoadingAchievements = !loadingPromises.achievements && achievements.length === 0 && currentUser.role !== 'manager';
+    const isLoadingHistory = !loadingPromises.history && history.length === 0;
     
     const availablePrizes = prizes.filter(p => p.cost <= currentUser.points);
     const unavailablePrizes = prizes.filter(p => p.cost > currentUser.points);
@@ -576,21 +560,22 @@ function renderMain() {
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="card">
                     <h3>👥 Команда</h3>
-                    ${!isLoading && activeEmployees.map(emp => {
-                        const empLevel = getLevel(emp.rating);
-                        return `
-                        <div class="employee" onclick="showEmployeeProfile(${emp.id})">
-                            <div><strong>${emp.name} ${emp.surname || ''}</strong> <span class="level-badge ${empLevel.class}">${empLevel.emoji} ${empLevel.name}</span><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
-                            ${isManager ? `
-                                <div onclick="event.stopPropagation()">
-                                    <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 5)">+5</button>
-                                    <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 10)">+10</button>
-                                    <button class="btn btn-secondary btn-small" onclick="let a=prompt('Сумма'); if(a) addPoints(${emp.id}, -parseInt(a))">-</button>
-                                    <button class="btn btn-danger btn-small" onclick="resetUserPassword(${emp.id})">Сброс пароля</button>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `}).join('')}
+                    ${isLoadingEmployees ? '<div class="loading"><span class="loader"></span> Загрузка сотрудников...</div>' : 
+                        activeEmployees.map(emp => {
+                            const empLevel = getLevel(emp.rating);
+                            return `
+                            <div class="employee" onclick="showEmployeeProfile(${emp.id})">
+                                <div><strong>${emp.name} ${emp.surname || ''}</strong> <span class="level-badge ${empLevel.class}">${empLevel.emoji} ${empLevel.name}</span><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
+                                ${isManager ? `
+                                    <div onclick="event.stopPropagation()">
+                                        <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 5)">+5</button>
+                                        <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 10)">+10</button>
+                                        <button class="btn btn-secondary btn-small" onclick="let a=prompt('Сумма'); if(a) addPoints(${emp.id}, -parseInt(a))">-</button>
+                                        <button class="btn btn-danger btn-small" onclick="resetUserPassword(${emp.id})">Сброс пароля</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `}).join('')}
                     ${isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
                 </div>
             </div>
@@ -599,7 +584,8 @@ function renderMain() {
             <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
                 <div class="card">
                     <h3>🎁 Призы</h3>
-                    ${!isManager ? `
+                    ${isLoadingPrizes ? '<div class="loading"><span class="loader"></span> Загрузка призов...</div>' : 
+                        !isManager ? `
                         <div class="prizes-section"><h4>✅ Доступные призы (${availablePrizes.length})</h4>
                         ${availablePrizes.map(p => `<div class="prize-item available-prize" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong> <span class="badge-available">✓ Доступен</span><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div><div>💰 ${p.cost} ОКОИНОВ</div></div>`).join('')}
                         </div>
@@ -625,7 +611,8 @@ function renderMain() {
                 <div class="card">
                     <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn" onclick="addAchievement()">➕ Добавить</button></div>
                     <div id="achievementsListContainer">
-                        ${isLoading ? '<div class="loading">Загрузка...</div>' : myAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : 
+                        ${isLoadingAchievements ? '<div class="loading"><span class="loader"></span> Загрузка достижений...</div>' : 
+                            myAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : 
                             myAchievements.map(a => `
                                 <div class="achievement-item">
                                     <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
@@ -644,9 +631,11 @@ function renderMain() {
             <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
                 <div class="card">
                     <h3>📜 Моя история операций</h3>
-                    ${myHistory.map(h => `
-                        <div class="history-item"><div><span class="history-date">${new Date(h.date).toLocaleString()}</span><br>${h.reason}: <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ</div></div>
-                    `).join('') || '<p class="loading">Нет операций</p>'}
+                    ${isLoadingHistory ? '<div class="loading"><span class="loader"></span> Загрузка истории...</div>' : 
+                        myHistory.map(h => `
+                            <div class="history-item"><div><span class="history-date">${new Date(h.date).toLocaleString()}</span><br>${h.reason}: <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ</div></div>
+                        `).join('') || '<p class="loading">Нет операций</p>'
+                    }
                 </div>
             </div>
             
@@ -714,8 +703,8 @@ function renderMain() {
         btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
     
-    if (isManager && activeTab === 'dashboard' && dataReady) {
-        renderDashboard();
+    if (isManager && activeTab === 'dashboard' && employees.length > 0 && history.length > 0) {
+        setTimeout(() => renderDashboard(), 50);
     }
 }
 
@@ -725,8 +714,8 @@ async function updateUserPoints(id, newPoints) {
         method: 'PATCH',
         body: JSON.stringify({ points: newPoints, rating: newPoints })
     });
-    await loadEmployees();
-    renderMain();
+    loadingPromises.employees = false;
+    loadEmployees();
     alert('Баланс обновлён');
 }
 
