@@ -71,12 +71,6 @@ let history = [];
 let activeTab = 'main';
 let dataReady = false;
 let dashboardChart = null;
-let loadingPromises = {
-    employees: false,
-    prizes: false,
-    achievements: false,
-    history: false
-};
 
 function getLevel(rating) {
     if (rating >= 500) return { name: 'Платина', emoji: '💎', class: 'level-platinum' };
@@ -107,40 +101,28 @@ async function api(url, options = {}) {
     }
 }
 
-// ========== ЗАГРУЗКА ДАННЫХ (ПО ОТДЕЛЬНОСТИ) ==========
+// ========== ЗАГРУЗКА ДАННЫХ ==========
 async function loadEmployees() {
-    if (loadingPromises.employees) return employees;
-    loadingPromises.employees = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
     if (data) employees = data;
-    renderMain();
-    return employees;
+    return data;
 }
 async function loadPrizes() {
-    if (loadingPromises.prizes) return prizes;
-    loadingPromises.prizes = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/prizes`);
     if (data) prizes = data;
-    renderMain();
-    return prizes;
+    return data;
 }
 async function loadAchievements() {
-    if (loadingPromises.achievements) return achievements;
-    loadingPromises.achievements = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
     if (data) achievements = data;
-    renderMain();
-    return achievements;
+    return data;
 }
 async function loadHistory() {
-    if (loadingPromises.history) return history;
-    loadingPromises.history = true;
     const data = await api(`${SUPABASE_URL}/rest/v1/history?order=date.desc`);
     if (data) history = data;
-    renderMain();
-    return history;
+    console.log('📜 Загружено записей истории:', data?.length || 0);
+    return data;
 }
-
 async function loadAllData() {
     await Promise.all([loadEmployees(), loadPrizes(), loadAchievements(), loadHistory()]);
     dataReady = true;
@@ -159,9 +141,7 @@ async function login() {
         if (data && data.length > 0) {
             currentUser = data[0];
             localStorage.setItem('user', JSON.stringify(currentUser));
-            // Показываем интерфейс сразу
             renderMain();
-            // Загружаем данные в фоне
             loadAllData();
         } else {
             errDiv.innerText = 'Неверный логин или пароль';
@@ -184,7 +164,6 @@ async function addPoints(empId, delta) {
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
     
-    // 1. Обновляем пользователя
     await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
         headers: {
@@ -195,7 +174,6 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
-    // 2. Добавляем запись в историю
     await fetch(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         headers: {
@@ -206,7 +184,6 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ user_id: empId, reason, delta })
     });
     
-    // 3. Обновляем локальные данные
     emp.points = newPoints;
     emp.rating = newRating;
     if (currentUser.id === empId) { 
@@ -214,10 +191,7 @@ async function addPoints(empId, delta) {
         currentUser.rating = newRating; 
     }
     
-    // 4. Перезагружаем историю
-    loadingPromises.history = false;
-    loadHistory();
-    
+    await loadHistory();
     renderMain();
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
 }
@@ -238,9 +212,8 @@ async function addEmployee() {
             points, rating: points, status: 'active'
         })
     });
-    
-    loadingPromises.employees = false;
-    loadEmployees();
+    await loadEmployees();
+    renderMain();
     alert('Сотрудник добавлен');
 }
 
@@ -255,8 +228,8 @@ async function editEmployee(empId, oldName, oldSurname, oldLogin) {
         method: 'PATCH',
         body: JSON.stringify({ name: newName, surname: newSurname, login: newLogin })
     });
-    loadingPromises.employees = false;
-    loadEmployees();
+    await loadEmployees();
+    renderMain();
     alert('Данные сотрудника обновлены');
 }
 
@@ -296,37 +269,86 @@ function showEmployeeProfile(empId) {
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 }
 
-// ========== ДОСТИЖЕНИЯ ==========
+// ========== ДОСТИЖЕНИЯ (С МГНОВЕННЫМ ОБНОВЛЕНИЕМ) ==========
 async function addAchievement() {
     const text = prompt('Текст достижения:');
     if (!text) return;
-    await api(`${SUPABASE_URL}/rest/v1/achievements`, {
+    
+    const result = await api(`${SUPABASE_URL}/rest/v1/achievements`, {
         method: 'POST',
         body: JSON.stringify({ user_id: currentUser.id, text })
     });
-    loadingPromises.achievements = false;
-    loadAchievements();
-    alert('Достижение добавлено');
+    
+    if (result) {
+        // Добавляем новое достижение в локальный массив
+        const newAchievement = { 
+            id: Date.now(), 
+            user_id: currentUser.id, 
+            text: text, 
+            date: new Date().toISOString() 
+        };
+        achievements.unshift(newAchievement);
+        refreshAchievementsList();
+        alert('Достижение добавлено');
+    } else {
+        alert('Ошибка добавления');
+    }
 }
 
 async function editAchievement(id, oldText) {
     const newText = prompt('Редактировать достижение:', oldText);
     if (!newText || newText === oldText) return;
-    await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
+    
+    const result = await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ text: newText })
     });
-    loadingPromises.achievements = false;
-    loadAchievements();
-    alert('Достижение обновлено');
+    
+    if (result) {
+        // Обновляем в локальном массиве
+        const index = achievements.findIndex(a => a.id === id);
+        if (index !== -1) {
+            achievements[index].text = newText;
+            refreshAchievementsList();
+        }
+        alert('Достижение обновлено');
+    } else {
+        alert('Ошибка обновления');
+    }
 }
 
 async function deleteAchievement(id) {
     if (!confirm('Удалить достижение?')) return;
-    await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
-    loadingPromises.achievements = false;
-    loadAchievements();
-    alert('Достижение удалено');
+    
+    const result = await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
+    
+    if (result !== null) {
+        // Удаляем из локального массива
+        achievements = achievements.filter(a => a.id !== id);
+        refreshAchievementsList();
+        alert('Достижение удалено');
+    } else {
+        alert('Ошибка удаления');
+    }
+}
+
+function refreshAchievementsList() {
+    const container = document.getElementById('achievementsListContainer');
+    if (!container) return;
+    const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
+    if (myAchievements.length === 0) {
+        container.innerHTML = '<p class="loading">Нет достижений. Добавьте первое!</p>';
+        return;
+    }
+    container.innerHTML = myAchievements.map(a => `
+        <div class="achievement-item">
+            <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
+            <div>
+                <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
+                <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
+            </div>
+        </div>
+    `).join('');
 }
 
 // ========== ПРИЗЫ ==========
@@ -340,8 +362,8 @@ async function addPrize() {
         method: 'POST',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    loadingPromises.prizes = false;
-    loadPrizes();
+    await loadPrizes();
+    renderMain();
     alert(`Приз "${name}" добавлен`);
 }
 
@@ -360,16 +382,16 @@ async function editPrize(id) {
         method: 'PATCH',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    loadingPromises.prizes = false;
-    loadPrizes();
+    await loadPrizes();
+    renderMain();
     alert('Приз обновлён');
 }
 
 async function deletePrize(id) {
     if (!confirm('Удалить приз?')) return;
     await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
-    loadingPromises.prizes = false;
-    loadPrizes();
+    await loadPrizes();
+    renderMain();
     alert('Приз удалён');
 }
 
@@ -392,7 +414,7 @@ async function changePassword() {
         body: JSON.stringify({ password: newPwd })
     });
     currentUser.password = newPwd;
-    alert('Пароль изменён');
+    alert('Пароль изменен');
 }
 
 // ========== ЭКСПОРТ В EXCEL ==========
@@ -403,7 +425,7 @@ function exportToExcel() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Сотрудники');
     XLSX.writeFile(wb, `okoiny_employees_${new Date().toISOString().slice(0,19)}.xlsx`);
-    alert('Экспорт сотрудников завершён');
+    alert('Экспорт сотрудников завершен');
 }
 
 function exportAchievementsToExcel() {
@@ -416,7 +438,7 @@ function exportAchievementsToExcel() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Достижения');
     XLSX.writeFile(wb, `okoiny_achievements_${new Date().toISOString().slice(0,19)}.xlsx`);
-    alert('Экспорт достижений завершён');
+    alert('Экспорт достижений завершен');
 }
 
 function exportHistoryToExcel() {
@@ -435,7 +457,7 @@ function exportHistoryToExcel() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'История операций');
     XLSX.writeFile(wb, `okoiny_history_${new Date().toISOString().slice(0,19)}.xlsx`);
-    alert('Экспорт истории завершён');
+    alert('Экспорт истории завершен');
 }
 
 // ========== ДАШБОРД ==========
@@ -509,12 +531,8 @@ function renderMain() {
     const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
     const myHistory = history.filter(h => h.user_id === currentUser.id).slice(0, 50);
     const totalEarned = myHistory.filter(h => h.delta > 0).reduce((s, h) => s + h.delta, 0);
+    const isLoading = !dataReady;
     const level = getLevel(currentUser.rating);
-    
-    const isLoadingEmployees = !loadingPromises.employees && employees.length === 0;
-    const isLoadingPrizes = !loadingPromises.prizes && prizes.length === 0;
-    const isLoadingAchievements = !loadingPromises.achievements && achievements.length === 0 && currentUser.role !== 'manager';
-    const isLoadingHistory = !loadingPromises.history && history.length === 0;
     
     const availablePrizes = prizes.filter(p => p.cost <= currentUser.points);
     const unavailablePrizes = prizes.filter(p => p.cost > currentUser.points);
@@ -538,9 +556,14 @@ function renderMain() {
             ${!isManager ? `
             <div class="card">
                 <div class="stats-row">
-                    <div class="stat-item"><div class="stat-label">🏆 Всего заработано</div><div class="stat-value">${totalEarned} ОКОИНОВ</div></div>
-                    <div class="stat-item"><div class="stat-label">💰 Текущий баланс</div><div class="stat-value">${currentUser.points} ОКОИНОВ</div></div>
-                    <div class="stat-item"><div class="stat-label">⭐ Рейтинг</div><div class="stat-value">${currentUser.rating}</div></div>
+                    <div class="stat-item">
+                        <div class="stat-label">🏆 Всего заработано</div>
+                        <div class="stat-value">${totalEarned} ОКОИНОВ</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">💰 Текущий баланс</div>
+                        <div class="stat-value">${currentUser.points} ОКОИНОВ</div>
+                    </div>
                 </div>
             </div>
             ` : ''}
@@ -560,7 +583,7 @@ function renderMain() {
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="card">
                     <h3>👥 Команда</h3>
-                    ${isLoadingEmployees ? '<div class="loading"><span class="loader"></span> Загрузка сотрудников...</div>' : 
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : 
                         activeEmployees.map(emp => {
                             const empLevel = getLevel(emp.rating);
                             return `
@@ -584,7 +607,7 @@ function renderMain() {
             <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
                 <div class="card">
                     <h3>🎁 Призы</h3>
-                    ${isLoadingPrizes ? '<div class="loading"><span class="loader"></span> Загрузка призов...</div>' : 
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : 
                         !isManager ? `
                         <div class="prizes-section"><h4>✅ Доступные призы (${availablePrizes.length})</h4>
                         ${availablePrizes.map(p => `<div class="prize-item available-prize" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong> <span class="badge-available">✓ Доступен</span><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div><div>💰 ${p.cost} ОКОИНОВ</div></div>`).join('')}
@@ -611,7 +634,7 @@ function renderMain() {
                 <div class="card">
                     <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn" onclick="addAchievement()">➕ Добавить</button></div>
                     <div id="achievementsListContainer">
-                        ${isLoadingAchievements ? '<div class="loading"><span class="loader"></span> Загрузка достижений...</div>' : 
+                        ${isLoading ? '<div class="loading">Загрузка...</div>' : 
                             myAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : 
                             myAchievements.map(a => `
                                 <div class="achievement-item">
@@ -631,10 +654,16 @@ function renderMain() {
             <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
                 <div class="card">
                     <h3>📜 Моя история операций</h3>
-                    ${isLoadingHistory ? '<div class="loading"><span class="loader"></span> Загрузка истории...</div>' : 
+                    ${isLoading ? '<div class="loading">Загрузка истории...</div>' : 
+                        myHistory.length === 0 ? '<div class="loading">Нет операций. Менеджер ещё не начислял вам баллы.</div>' : 
                         myHistory.map(h => `
-                            <div class="history-item"><div><span class="history-date">${new Date(h.date).toLocaleString()}</span><br>${h.reason}: <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ</div></div>
-                        `).join('') || '<p class="loading">Нет операций</p>'
+                            <div class="history-item">
+                                <div>
+                                    <span class="history-date">${new Date(h.date).toLocaleString()}</span><br>
+                                    ${h.reason}: <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ
+                                </div>
+                            </div>
+                        `).join('')
                     }
                 </div>
             </div>
@@ -714,8 +743,8 @@ async function updateUserPoints(id, newPoints) {
         method: 'PATCH',
         body: JSON.stringify({ points: newPoints, rating: newPoints })
     });
-    loadingPromises.employees = false;
-    loadEmployees();
+    await loadEmployees();
+    renderMain();
     alert('Баланс обновлён');
 }
 
