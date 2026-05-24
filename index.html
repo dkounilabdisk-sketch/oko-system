@@ -200,6 +200,23 @@ async function addEmployee() {
     alert('Сотрудник добавлен');
 }
 
+// НОВАЯ ФУНКЦИЯ: Редактирование сотрудника
+async function editEmployee(empId, oldName, oldSurname, oldLogin) {
+    const newName = prompt('Имя:', oldName);
+    if (!newName) return;
+    const newSurname = prompt('Фамилия:', oldSurname || '');
+    const newLogin = prompt('Логин:', oldLogin);
+    if (!newLogin) return;
+    
+    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: newName, surname: newSurname, login: newLogin })
+    });
+    await loadEmployees();
+    renderMain();
+    alert('Данные сотрудника обновлены');
+}
+
 async function resetUserPassword(userId) {
     const newPassword = 'OKOin2024!';
     await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
@@ -224,6 +241,7 @@ function showEmployeeProfile(empId) {
             <div>⭐ ${emp.rating} ${getLevel(emp.rating).emoji} ${getLevel(emp.rating).name}</div>
             <div>💰 ${emp.points} ОКОИНОВ</div>
             <div>✉️ ${emp.email || 'не указан'}</div>
+            <div>🔑 Логин: ${emp.login}</div>
         </div>
         <h3>🌟 Достижения</h3>
         ${empAchievements.map(a => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><small>${new Date(a.date).toLocaleString()}</small><br>✨ ${a.text}</div>`).join('') || '<p>Нет достижений</p>'}
@@ -423,7 +441,6 @@ function renderMain() {
     const isLoading = !dataReady;
     const level = getLevel(currentUser.rating);
     
-    // Подсветка доступных призов для сотрудника
     const availablePrizes = prizes.filter(p => p.cost <= currentUser.points);
     
     const html = `
@@ -554,6 +571,19 @@ function renderMain() {
                     `).join('')}
                     ${prizes.length === 0 ? '<p>Нет призов</p>' : ''}
                     <hr style="margin: 20px 0;">
+                    <h3>👥 Управление сотрудниками</h3>
+                    ${employees.map(emp => `
+                        <div class="employee">
+                            <div><strong>${emp.name} ${emp.surname || ''}</strong><br>🔑 ${emp.login}<br>💰 ${emp.points} ОКОИНОВ</div>
+                            <div>
+                                <button class="btn btn-secondary btn-small" onclick="editEmployee(${emp.id}, '${emp.name.replace(/'/g, "\\'")}', '${(emp.surname || '').replace(/'/g, "\\'")}', '${emp.login.replace(/'/g, "\\'")}')">✏️ Редактировать</button>
+                                <button class="btn btn-secondary btn-small" onclick="updateUserPoints(${emp.id}, parseInt(prompt('Новый баланс:', ${emp.points})))">💰 Баланс</button>
+                                <button class="btn btn-secondary btn-small" onclick="updateUserEmail(${emp.id}, prompt('Новый email:', '${emp.email || ''}'))">✉️ Email</button>
+                                <button class="btn btn-warning btn-small" onclick="resetUserPassword(${emp.id})">🔄 Сброс пароля</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                    <hr style="margin: 20px 0;">
                     <div class="flex"><h3>📎 Экспорт данных</h3><button class="btn" onclick="exportToExcel()">📊 Экспорт в Excel</button></div>
                 </div>
             </div>
@@ -580,6 +610,29 @@ function renderMain() {
     }
 }
 
+// Дополнительные функции для менеджера
+async function updateUserPoints(id, newPoints) {
+    if (isNaN(newPoints)) return;
+    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ points: newPoints, rating: newPoints })
+    });
+    await loadEmployees();
+    renderMain();
+    alert('Баланс обновлён');
+}
+
+async function updateUserEmail(id, email) {
+    if (!email) return;
+    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ email })
+    });
+    await loadEmployees();
+    renderMain();
+    alert('Email обновлён');
+}
+
 // ЗАПУСК
 const saved = localStorage.getItem('user');
 if (saved) {
@@ -596,6 +649,7 @@ window.login = login;
 window.logout = logout;
 window.addPoints = addPoints;
 window.addEmployee = addEmployee;
+window.editEmployee = editEmployee;
 window.addPrize = addPrize;
 window.editPrize = editPrize;
 window.deletePrize = deletePrize;
@@ -609,6 +663,8 @@ window.resetUserPassword = resetUserPassword;
 window.exportToExcel = exportToExcel;
 window.uploadPhoto = uploadPhoto;
 window.showEmployeeProfile = showEmployeeProfile;
+window.updateUserPoints = updateUserPoints;
+window.updateUserEmail = updateUserEmail;
 </script>
 </body>
 </html>
