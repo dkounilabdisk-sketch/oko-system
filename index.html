@@ -17,20 +17,19 @@
         .prize-item { cursor: pointer; }
         .login-box { max-width: 400px; margin: 50px auto; text-align: center; }
         .error { color: red; margin-top: 10px; }
-        .loading { text-align: center; padding: 40px; }
         .tab { display: none; }
         .tab.active { display: block; }
         .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px; }
-        .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; }
+        .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; font-size: 14px; }
         .tab-btn.active { background: #2d6a4f; color: white; }
-        .prize-detail { font-size: 13px; color: #666; margin-top: 5px; }
+        .loading { text-align: center; padding: 20px; color: #666; }
+        .level { background: #fbbf24; padding: 2px 8px; border-radius: 60px; font-size: 11px; font-weight: 600; }
     </style>
 </head>
 <body>
 <div id="app"></div>
 
 <script>
-// Конфигурация
 const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
 
@@ -38,8 +37,8 @@ let currentUser = null;
 let employees = [];
 let prizes = [];
 let activeTab = 'main';
+let dataReady = false;
 
-// API запрос
 async function api(url, options = {}) {
     const res = await fetch(url, {
         ...options,
@@ -51,6 +50,23 @@ async function api(url, options = {}) {
         }
     });
     return await res.json();
+}
+
+// ========== ЗАГРУЗКА ДАННЫХ (ФОНОВАЯ) ==========
+async function loadEmployees() {
+    const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
+    if (data) employees = data;
+}
+
+async function loadPrizes() {
+    const data = await api(`${SUPABASE_URL}/rest/v1/prizes`);
+    if (data) prizes = data;
+}
+
+async function loadAllData() {
+    await Promise.all([loadEmployees(), loadPrizes()]);
+    dataReady = true;
+    renderMain();
 }
 
 // ========== АУТЕНТИФИКАЦИЯ ==========
@@ -72,15 +88,13 @@ async function login() {
         if (data && data.length > 0) {
             currentUser = data[0];
             localStorage.setItem('user', JSON.stringify(currentUser));
-            await Promise.all([loadEmployees(), loadPrizes()]);
-            activeTab = 'main';
-            renderMain();
+            renderMain(); // Сразу показываем интерфейс (с загрузкой)
+            loadAllData(); // Грузим данные в фоне
         } else {
             errDiv.innerText = 'Неверный логин или пароль';
         }
     } catch(e) {
         errDiv.innerText = 'Ошибка соединения';
-        console.error(e);
     }
 }
 
@@ -88,17 +102,6 @@ function logout() {
     currentUser = null;
     localStorage.removeItem('user');
     renderLogin();
-}
-
-// ========== ЗАГРУЗКА ДАННЫХ ==========
-async function loadEmployees() {
-    const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
-    if (data) employees = data;
-}
-
-async function loadPrizes() {
-    const data = await api(`${SUPABASE_URL}/rest/v1/prizes`);
-    if (data) prizes = data;
 }
 
 // ========== БАЛЛЫ ==========
@@ -151,7 +154,7 @@ async function addEmployee() {
     alert('Сотрудник добавлен');
 }
 
-// ========== ПРИЗЫ (CRUD для менеджера) ==========
+// ========== ПРИЗЫ ==========
 async function addPrize() {
     const name = prompt('Название приза');
     const cost = parseInt(prompt('Стоимость в ОКОИНАХ'));
@@ -182,6 +185,27 @@ function showPrizeInfo(prize) {
     alert(`🎁 ${prize.name}\n\n📖 ${prize.description || 'Нет описания'}\n💰 ${prize.cost} ОКОИНОВ\n\n📌 Условия: ${prize.conditions || 'Нет'}`);
 }
 
+// ========== СМЕНА ПАРОЛЯ ==========
+async function changePassword() {
+    const oldPwd = prompt('Текущий пароль:');
+    if (oldPwd !== currentUser.password) {
+        alert('Неверный текущий пароль');
+        return;
+    }
+    const newPwd = prompt('Новый пароль (мин 8 символов, заглавная буква, цифра, спецсимвол):');
+    if (!newPwd) return;
+    if (newPwd.length < 8 || !/[A-Z]/.test(newPwd) || !/[0-9]/.test(newPwd) || !/[!@#$%^&*]/.test(newPwd)) {
+        alert('Пароль слишком простой');
+        return;
+    }
+    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${currentUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ password: newPwd })
+    });
+    currentUser.password = newPwd;
+    alert('Пароль изменён');
+}
+
 // ========== ОТРИСОВКА ==========
 function setActiveTab(tab) { activeTab = tab; renderMain(); }
 
@@ -200,8 +224,11 @@ function renderLogin() {
 }
 
 function renderMain() {
+    if (!currentUser) return;
+    
     const isManager = currentUser?.role === 'manager';
     const activeEmployees = employees.filter(e => e.status !== 'archived');
+    const isLoading = !dataReady;
     
     const html = `
         <div style="max-width: 1200px; margin: 0 auto;">
@@ -210,6 +237,7 @@ function renderMain() {
                 <div class="flex">
                     <div><strong>${currentUser.name}</strong> ⭐ ${currentUser.rating} | 💰 ${currentUser.points}</div>
                     <button class="btn btn-secondary" onclick="logout()">Выйти</button>
+                    <button class="btn btn-secondary" onclick="changePassword()">Сменить пароль</button>
                 </div>
             </div>
             
@@ -219,11 +247,12 @@ function renderMain() {
                 ${isManager ? '<button class="tab-btn" data-tab="manage">⚙️ Управление</button>' : ''}
             </div>
             
-            <!-- Вкладка: Команда -->
+            <!-- Команда -->
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="card">
                     <h3>👥 Команда</h3>
-                    ${activeEmployees.map(emp => `
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
+                    ${!isLoading && activeEmployees.map(emp => `
                         <div class="employee">
                             <div><strong>${emp.name} ${emp.surname || ''}</strong><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
                             ${isManager ? `
@@ -235,26 +264,26 @@ function renderMain() {
                             ` : ''}
                         </div>
                     `).join('')}
-                    ${isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
+                    ${!isLoading && isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
                 </div>
             </div>
             
-            <!-- Вкладка: Призы -->
+            <!-- Призы -->
             <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
                 <div class="card">
                     <h3>🎁 Призы</h3>
-                    ${prizes.map(p => `
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
+                    ${!isLoading && prizes.map(p => `
                         <div class="prize-item" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                            <div><strong>${p.name}</strong><br><span class="prize-detail">${p.description ? p.description.substring(0, 50) : ''}</span></div>
+                            <div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div>
                             <div>💰 ${p.cost} ОКОИНОВ</div>
                         </div>
                     `).join('')}
-                    ${prizes.length === 0 ? '<p style="color:#888;">Нет призов</p>' : ''}
+                    ${!isLoading && prizes.length === 0 ? '<p>Нет призов</p>' : ''}
                 </div>
             </div>
             
             ${isManager ? `
-            <!-- Вкладка: Управление призами -->
             <div id="tab-manage" class="tab ${activeTab === 'manage' ? 'active' : ''}">
                 <div class="card">
                     <div class="flex"><h3>🎁 Управление призами</h3><button class="btn" onclick="addPrize()">➕ Добавить приз</button></div>
@@ -273,24 +302,23 @@ function renderMain() {
     
     document.getElementById('app').innerHTML = html;
     
-    // Обработчики вкладок
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
 }
 
-// Запуск
+// ЗАПУСК
 const saved = localStorage.getItem('user');
 if (saved) {
     try {
         currentUser = JSON.parse(saved);
-        Promise.all([loadEmployees(), loadPrizes()]).then(() => renderMain());
+        renderMain(); // Показываем интерфейс сразу
+        loadAllData(); // Данные подгружаем в фоне
     } catch(e) { renderLogin(); }
 } else {
     renderLogin();
 }
 
-// Глобальные функции
 window.login = login;
 window.logout = logout;
 window.addPoints = addPoints;
@@ -298,6 +326,7 @@ window.addEmployee = addEmployee;
 window.addPrize = addPrize;
 window.deletePrize = deletePrize;
 window.showPrizeInfo = showPrizeInfo;
+window.changePassword = changePassword;
 </script>
 </body>
 </html>
