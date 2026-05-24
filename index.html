@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ОКОИНЫ</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; padding: 20px; }
@@ -27,6 +28,15 @@
         .history-date { font-size: 11px; color: #666; }
         .history-delta-plus { color: #2d6a4f; font-weight: 600; }
         .history-delta-minus { color: #dc2626; font-weight: 600; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #f0fdf4; border-radius: 20px; padding: 15px; text-align: center; }
+        .stat-number { font-size: 28px; font-weight: 800; color: #2d6a4f; }
+        .chart-container { max-height: 250px; margin-top: 20px; }
+        .level-badge { display: inline-block; padding: 2px 10px; border-radius: 60px; font-size: 11px; font-weight: 600; }
+        .level-bronze { background: #cd7f32; color: white; }
+        .level-silver { background: #94a3b8; color: white; }
+        .level-gold { background: #fbbf24; color: #1e293b; }
+        .level-platinum { background: #c084fc; color: white; }
     </style>
 </head>
 <body>
@@ -43,6 +53,15 @@ let achievements = [];
 let history = [];
 let activeTab = 'main';
 let dataReady = false;
+let dashboardChart = null;
+
+// Уровни
+function getLevel(rating) {
+    if (rating >= 500) return { name: 'Платина', emoji: '💎', class: 'level-platinum' };
+    if (rating >= 300) return { name: 'Золото', emoji: '🥇', class: 'level-gold' };
+    if (rating >= 100) return { name: 'Серебро', emoji: '🥈', class: 'level-silver' };
+    return { name: 'Бронза', emoji: '🥉', class: 'level-bronze' };
+}
 
 async function api(url, options = {}) {
     const res = await fetch(url, {
@@ -62,22 +81,18 @@ async function loadEmployees() {
     const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
     if (data) employees = data;
 }
-
 async function loadPrizes() {
     const data = await api(`${SUPABASE_URL}/rest/v1/prizes`);
     if (data) prizes = data;
 }
-
 async function loadAchievements() {
     const data = await api(`${SUPABASE_URL}/rest/v1/achievements`);
     if (data) achievements = data;
 }
-
 async function loadHistory() {
     const data = await api(`${SUPABASE_URL}/rest/v1/history`);
     if (data) history = data;
 }
-
 async function loadAllData() {
     await Promise.all([loadEmployees(), loadPrizes(), loadAchievements(), loadHistory()]);
     dataReady = true;
@@ -89,17 +104,10 @@ async function login() {
     const login = document.getElementById('login').value.trim();
     const pass = document.getElementById('pass').value;
     const errDiv = document.getElementById('errorMsg');
-    
-    if (!login || !pass) {
-        errDiv.innerText = 'Введите логин и пароль';
-        return;
-    }
-    
+    if (!login || !pass) { errDiv.innerText = 'Введите логин и пароль'; return; }
     errDiv.innerText = 'Проверка...';
-    
     try {
         const data = await api(`${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(pass)}`);
-        
         if (data && data.length > 0) {
             currentUser = data[0];
             localStorage.setItem('user', JSON.stringify(currentUser));
@@ -108,45 +116,29 @@ async function login() {
         } else {
             errDiv.innerText = 'Неверный логин или пароль';
         }
-    } catch(e) {
-        errDiv.innerText = 'Ошибка соединения';
-    }
+    } catch(e) { errDiv.innerText = 'Ошибка соединения'; }
 }
-
-function logout() {
-    currentUser = null;
-    localStorage.removeItem('user');
-    renderLogin();
-}
+function logout() { currentUser = null; localStorage.removeItem('user'); renderLogin(); }
 
 // ========== БАЛЛЫ ==========
 async function addPoints(empId, delta) {
     const emp = employees.find(e => e.id === empId);
     if (!emp) return;
-    
     const reason = prompt('Причина:', delta > 0 ? 'Бонус' : 'Замечание');
     if (!reason) return;
-    
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
-    
     await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
-    
     await api(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         body: JSON.stringify({ user_id: empId, reason, delta })
     });
-    
     emp.points = newPoints;
     emp.rating = newRating;
-    if (currentUser.id === empId) {
-        currentUser.points = newPoints;
-        currentUser.rating = newRating;
-    }
-    
+    if (currentUser.id === empId) { currentUser.points = newPoints; currentUser.rating = newRating; }
     await loadHistory();
     renderMain();
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
@@ -159,9 +151,7 @@ async function addEmployee() {
     const login = prompt('Логин');
     const password = prompt('Пароль');
     const points = parseInt(prompt('Начальные баллы', 0));
-    
     if (!name || !surname || !login || !password) return;
-    
     await api(`${SUPABASE_URL}/rest/v1/users`, {
         method: 'POST',
         body: JSON.stringify({
@@ -169,27 +159,33 @@ async function addEmployee() {
             points, rating: points, photo: '', email: '', status: 'active'
         })
     });
-    
     await loadEmployees();
     renderMain();
     alert('Сотрудник добавлен');
+}
+
+async function resetUserPassword(userId) {
+    const newPassword = 'OKOin2024!';
+    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ password: newPassword })
+    });
+    await loadEmployees();
+    alert(`Пароль сброшен на: ${newPassword}`);
 }
 
 // ========== ДОСТИЖЕНИЯ ==========
 async function addAchievement() {
     const text = prompt('Текст достижения:');
     if (!text) return;
-    
     await api(`${SUPABASE_URL}/rest/v1/achievements`, {
         method: 'POST',
         body: JSON.stringify({ user_id: currentUser.id, text })
     });
-    
     await loadAchievements();
     renderMain();
     alert('Достижение добавлено');
 }
-
 async function deleteAchievement(id) {
     if (!confirm('Удалить достижение?')) return;
     await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
@@ -203,19 +199,15 @@ async function addPrize() {
     const cost = parseInt(prompt('Стоимость в ОКОИНАХ'));
     const desc = prompt('Описание');
     const conditions = prompt('Условия получения');
-    
     if (!name || !cost) return;
-    
     await api(`${SUPABASE_URL}/rest/v1/prizes`, {
         method: 'POST',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    
     await loadPrizes();
     renderMain();
     alert(`Приз "${name}" добавлен`);
 }
-
 async function deletePrize(id) {
     if (!confirm('Удалить приз?')) return;
     await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
@@ -223,18 +215,14 @@ async function deletePrize(id) {
     renderMain();
     alert('Приз удалён');
 }
-
 function showPrizeInfo(prize) {
     alert(`🎁 ${prize.name}\n\n📖 ${prize.description || 'Нет описания'}\n💰 ${prize.cost} ОКОИНОВ\n\n📌 Условия: ${prize.conditions || 'Нет'}`);
 }
 
-// ========== СМЕНА ПАРОЛЯ ==========
+// ========== ПРОФИЛЬ ==========
 async function changePassword() {
     const oldPwd = prompt('Текущий пароль:');
-    if (oldPwd !== currentUser.password) {
-        alert('Неверный текущий пароль');
-        return;
-    }
+    if (oldPwd !== currentUser.password) { alert('Неверный текущий пароль'); return; }
     const newPwd = prompt('Новый пароль (мин 8 символов, заглавная буква, цифра, спецсимвол):');
     if (!newPwd) return;
     if (newPwd.length < 8 || !/[A-Z]/.test(newPwd) || !/[0-9]/.test(newPwd) || !/[!@#$%^&*]/.test(newPwd)) {
@@ -247,6 +235,67 @@ async function changePassword() {
     });
     currentUser.password = newPwd;
     alert('Пароль изменён');
+}
+
+async function updateEmail() {
+    const newEmail = prompt('Новый email:', currentUser.email || '');
+    if (newEmail === null) return;
+    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${currentUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ email: newEmail })
+    });
+    currentUser.email = newEmail;
+    alert('Email обновлён');
+}
+
+// ========== ДАШБОРД ==========
+function renderDashboard() {
+    const container = document.getElementById('dashboardContent');
+    if (!container) return;
+    
+    const activeEmps = employees.filter(e => e.status !== 'archived');
+    const totalPoints = activeEmps.reduce((s,e) => s + e.points, 0);
+    const totalRating = activeEmps.reduce((s,e) => s + e.rating, 0);
+    const avgRating = activeEmps.length ? Math.round(totalRating / activeEmps.length) : 0;
+    const topEmployees = [...activeEmps].sort((a,b) => b.rating - a.rating).slice(0,5);
+    
+    const last7Days = [];
+    const dailyTotals = {};
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const key = d.toISOString().slice(0,10);
+        last7Days.push(key.slice(5));
+        dailyTotals[key] = 0;
+    }
+    history.forEach(h => {
+        const date = h.date.slice(0,10);
+        if (dailyTotals[date] !== undefined && h.delta > 0) dailyTotals[date] += h.delta;
+    });
+    const chartData = last7Days.map(d => dailyTotals[d] || 0);
+    
+    container.innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card"><div>👥</div><div class="stat-number">${activeEmps.length}</div><div>Сотрудников</div></div>
+            <div class="stat-card"><div>💰</div><div class="stat-number">${totalPoints}</div><div>Всего ОКОИНОВ</div></div>
+            <div class="stat-card"><div>⭐</div><div class="stat-number">${totalRating}</div><div>Рейтинг</div></div>
+            <div class="stat-card"><div>📊</div><div class="stat-number">${avgRating}</div><div>Средний рейтинг</div></div>
+        </div>
+        <div class="chart-container"><canvas id="dashboardCanvas"></canvas></div>
+        <h4 style="margin-top:20px;">🏆 Топ-5 сотрудников</h4>
+        ${topEmployees.map((e,i) => `<div class="flex" style="padding:8px 0; border-bottom:1px solid #eee;"><span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} ${e.name} ${e.surname || ''}</span><span class="level-badge ${getLevel(e.rating).class}">⭐ ${e.rating}</span></div>`).join('')}
+    `;
+    
+    const ctx = document.getElementById('dashboardCanvas')?.getContext('2d');
+    if (ctx) {
+        if (dashboardChart) dashboardChart.destroy();
+        dashboardChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: last7Days, datasets: [{ label: 'Начислено ОКОИНОВ', data: chartData, borderColor: '#2d6a4f', backgroundColor: 'rgba(45,106,79,0.1)', tension: 0.3, fill: true }] },
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+    }
 }
 
 // ========== ОТРИСОВКА ==========
@@ -274,15 +323,19 @@ function renderMain() {
     const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
     const myHistory = history.filter(h => h.user_id === currentUser.id).slice(0, 30);
     const isLoading = !dataReady;
+    const level = getLevel(currentUser.rating);
     
     const html = `
         <div style="max-width: 1200px; margin: 0 auto;">
             <div class="card flex">
                 <h1>🏆 ОКОИНЫ</h1>
                 <div class="flex">
-                    <div><strong>${currentUser.name}</strong> ⭐ ${currentUser.rating} | 💰 ${currentUser.points}</div>
-                    <button class="btn btn-secondary" onclick="logout()">Выйти</button>
-                    <button class="btn btn-secondary" onclick="changePassword()">Сменить пароль</button>
+                    <div><strong>${currentUser.name}</strong> ⭐ ${currentUser.rating} <span class="level-badge ${level.class}">${level.emoji} ${level.name}</span><br>💰 ${currentUser.points} ОКОИНОВ</div>
+                    <div class="flex">
+                        <button class="btn btn-secondary btn-small" onclick="logout()">Выйти</button>
+                        <button class="btn btn-secondary btn-small" onclick="changePassword()">Сменить пароль</button>
+                        <button class="btn btn-secondary btn-small" onclick="updateEmail()">✉️ Email</button>
+                    </div>
                 </div>
             </div>
             
@@ -291,6 +344,7 @@ function renderMain() {
                 <button class="tab-btn ${activeTab === 'prizes' ? 'active' : ''}" data-tab="prizes">🎁 Призы</button>
                 <button class="tab-btn ${activeTab === 'achievements' ? 'active' : ''}" data-tab="achievements">🌟 Достижения</button>
                 <button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" data-tab="history">📜 История</button>
+                ${isManager ? '<button class="tab-btn" data-tab="dashboard">📊 Дашборд</button>' : ''}
                 ${isManager ? '<button class="tab-btn" data-tab="manage">⚙️ Управление</button>' : ''}
             </div>
             
@@ -299,18 +353,21 @@ function renderMain() {
                 <div class="card">
                     <h3>👥 Команда</h3>
                     ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
-                    ${!isLoading && activeEmployees.map(emp => `
+                    ${!isLoading && activeEmployees.map(emp => {
+                        const empLevel = getLevel(emp.rating);
+                        return `
                         <div class="employee">
-                            <div><strong>${emp.name} ${emp.surname || ''}</strong><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
+                            <div><strong>${emp.name} ${emp.surname || ''}</strong> <span class="level-badge ${empLevel.class}">${empLevel.emoji} ${empLevel.name}</span><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
                             ${isManager ? `
                                 <div>
                                     <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 5)">+5</button>
                                     <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 10)">+10</button>
                                     <button class="btn btn-secondary btn-small" onclick="let a=prompt('Сумма'); if(a) addPoints(${emp.id}, -parseInt(a))">-</button>
+                                    <button class="btn btn-danger btn-small" onclick="resetUserPassword(${emp.id})">Сброс пароля</button>
                                 </div>
                             ` : ''}
                         </div>
-                    `).join('')}
+                    `}).join('')}
                     ${!isLoading && isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
                 </div>
             </div>
@@ -363,6 +420,10 @@ function renderMain() {
             </div>
             
             ${isManager ? `
+            <!-- Дашборд -->
+            <div id="tab-dashboard" class="tab ${activeTab === 'dashboard' ? 'active' : ''}"><div id="dashboardContent"></div></div>
+            
+            <!-- Управление -->
             <div id="tab-manage" class="tab ${activeTab === 'manage' ? 'active' : ''}">
                 <div class="card">
                     <div class="flex"><h3>🎁 Управление призами</h3><button class="btn" onclick="addPrize()">➕ Добавить приз</button></div>
@@ -384,6 +445,10 @@ function renderMain() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
+    
+    if (isManager && activeTab === 'dashboard' && dataReady) {
+        renderDashboard();
+    }
 }
 
 // ЗАПУСК
@@ -406,8 +471,10 @@ window.addPrize = addPrize;
 window.deletePrize = deletePrize;
 window.showPrizeInfo = showPrizeInfo;
 window.changePassword = changePassword;
+window.updateEmail = updateEmail;
 window.addAchievement = addAchievement;
 window.deleteAchievement = deleteAchievement;
+window.resetUserPassword = resetUserPassword;
 </script>
 </body>
 </html>
