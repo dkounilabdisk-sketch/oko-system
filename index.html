@@ -144,16 +144,19 @@ async function addPoints(empId, delta) {
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
     
+    // Обновляем пользователя
     await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
+    // Добавляем запись в историю
     await api(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         body: JSON.stringify({ user_id: empId, reason, delta })
     });
     
+    // Обновляем локальные данные
     emp.points = newPoints;
     emp.rating = newRating;
     if (currentUser.id === empId) { 
@@ -178,7 +181,7 @@ async function addEmployee() {
         method: 'POST',
         body: JSON.stringify({
             name, surname, login, password, role: 'employee',
-            points, rating: points, photo: '', status: 'active'
+            points, rating: points, status: 'active'
         })
     });
     await loadEmployees();
@@ -314,14 +317,20 @@ async function editPrize(id) {
     const name = prompt('Название', prize.name);
     if (!name) return;
     const cost = parseInt(prompt('Стоимость', prize.cost));
-    if (!cost) return;
+    if (isNaN(cost)) return;
     const desc = prompt('Описание', prize.description || '');
     const conditions = prompt('Условия получения', prize.conditions || '');
     
-    await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, {
+    console.log('Отправка обновления:', { name, cost, desc, conditions });
+    
+    const result = await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
+    
+    console.log('Результат обновления:', result);
+    
+    // Принудительно перезагружаем призы
     await loadPrizes();
     renderMain();
     alert('Приз обновлён');
@@ -364,8 +373,42 @@ function exportToExcel() {
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Сотрудники');
-    XLSX.writeFile(wb, `okoiny_${new Date().toISOString().slice(0,19)}.xlsx`);
-    alert('Экспорт завершён');
+    XLSX.writeFile(wb, `okoiny_employees_${new Date().toISOString().slice(0,19)}.xlsx`);
+    alert('Экспорт сотрудников завершён');
+}
+
+// НОВАЯ ФУНКЦИЯ: Экспорт достижений в Excel
+function exportAchievementsToExcel() {
+    const data = [['Дата', 'Сотрудник', 'Достижение']];
+    achievements.forEach(a => {
+        const emp = employees.find(e => e.id === a.user_id);
+        data.push([new Date(a.date).toLocaleString(), emp ? `${emp.name} ${emp.surname || ''}` : 'Неизвестный', a.text]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Достижения');
+    XLSX.writeFile(wb, `okoiny_achievements_${new Date().toISOString().slice(0,19)}.xlsx`);
+    alert('Экспорт достижений завершён');
+}
+
+// НОВАЯ ФУНКЦИЯ: Экспорт истории операций в Excel
+function exportHistoryToExcel() {
+    const data = [['Дата', 'Сотрудник', 'Причина', 'Изменение', 'Тип']];
+    history.forEach(h => {
+        const emp = employees.find(e => e.id === h.user_id);
+        data.push([
+            new Date(h.date).toLocaleString(), 
+            emp ? `${emp.name} ${emp.surname || ''}` : 'Неизвестный', 
+            h.reason, 
+            h.delta,
+            h.delta > 0 ? 'Начисление' : 'Списание'
+        ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'История операций');
+    XLSX.writeFile(wb, `okoiny_history_${new Date().toISOString().slice(0,19)}.xlsx`);
+    alert('Экспорт истории завершён');
 }
 
 // ========== ДАШБОРД ==========
@@ -626,7 +669,11 @@ function renderMain() {
                         </div>
                     `).join('')}
                     <hr style="margin: 20px 0;">
-                    <div class="flex"><h3>📎 Экспорт данных</h3><button class="btn" onclick="exportToExcel()">📊 Экспорт в Excel</button></div>
+                    <div class="flex"><h3>📎 Экспорт данных</h3>
+                        <button class="btn btn-secondary btn-small" onclick="exportToExcel()">📊 Сотрудники</button>
+                        <button class="btn btn-secondary btn-small" onclick="exportAchievementsToExcel()">🏅 Достижения</button>
+                        <button class="btn btn-secondary btn-small" onclick="exportHistoryToExcel()">📋 История</button>
+                    </div>
                 </div>
             </div>
             
@@ -651,7 +698,7 @@ function renderMain() {
             <!-- Все достижения по всем сотрудникам -->
             <div id="tab-allachievements" class="tab ${activeTab === 'allachievements' ? 'active' : ''}">
                 <div class="card">
-                    <h3>🏅 Все достижения сотрудников</h3>
+                    <div class="flex"><h3>🏅 Все достижения сотрудников</h3><button class="btn btn-secondary btn-small" onclick="exportAchievementsToExcel()">📊 Экспорт в Excel</button></div>
                     ${allAchievements.map(a => {
                         const emp = employees.find(e => e.id === a.user_id);
                         return `
@@ -719,6 +766,8 @@ window.editAchievement = editAchievement;
 window.deleteAchievement = deleteAchievement;
 window.resetUserPassword = resetUserPassword;
 window.exportToExcel = exportToExcel;
+window.exportAchievementsToExcel = exportAchievementsToExcel;
+window.exportHistoryToExcel = exportHistoryToExcel;
 window.showEmployeeProfile = showEmployeeProfile;
 window.updateUserPoints = updateUserPoints;
 </script>
