@@ -2,106 +2,749 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ОКОИНЫ — вход</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ОКОИНЫ — мотивация сотрудников</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, 'Inter', sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
-        .card { background: white; border-radius: 28px; padding: 32px; max-width: 400px; width: 100%; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        h1 { text-align: center; margin-bottom: 24px; background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        input { width: 100%; padding: 12px 16px; margin-bottom: 16px; border-radius: 60px; border: 1px solid #cbd5e1; font-size: 16px; box-sizing: border-box; }
-        button { width: 100%; background: #2d6a4f; color: white; border: none; padding: 12px; border-radius: 60px; font-size: 16px; font-weight: 600; cursor: pointer; }
-        button:hover { background: #1f543f; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card { background: rgba(255,255,255,0.96); backdrop-filter: blur(4px); border-radius: 28px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); transition: all 0.2s; }
+        .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
+        .employee-card, .prize-card, .achievement-item { background: white; border-radius: 20px; padding: 14px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .employee-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.1); }
+        .prize-card { cursor: pointer; }
+        .prize-card:hover { transform: translateY(-2px); background: #f8fafc; }
+        .btn { padding: 8px 18px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+        .btn-primary { background: #2d6a4f; color: white; box-shadow: 0 2px 6px rgba(45,106,79,0.3); }
+        .btn-primary:hover { background: #1f543f; transform: translateY(-1px); }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .btn-warning { background: #f97316; color: white; }
+        .btn-warning:hover { background: #ea580c; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .level-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 60px; font-size: 12px; font-weight: 700; }
+        .level-bronze { background: linear-gradient(135deg, #cd7f32, #b8692a); color: white; }
+        .level-silver { background: linear-gradient(135deg, #94a3b8, #7e8a98); color: white; }
+        .level-gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1e293b; }
+        .level-platinum { background: linear-gradient(135deg, #c084fc, #a855f7); color: white; }
+        input, textarea { padding: 10px 16px; border-radius: 60px; border: 1px solid #cbd5e1; background: white; font-family: inherit; font-size: 14px; transition: all 0.2s; }
+        input:focus, textarea:focus { outline: none; border-color: #2d6a4f; box-shadow: 0 0 0 3px rgba(45,106,79,0.1); }
+        textarea { border-radius: 20px; min-height: 80px; resize: vertical; }
+        .avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
+        .avatar-large { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #2d6a4f; background: #e2e8f0; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: rgba(255,255,255,0.7); border-radius: 24px; padding: 16px; text-align: center; backdrop-filter: blur(4px); }
+        .notification { position: fixed; bottom: 20px; right: 20px; background: white; padding: 12px 24px; border-radius: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; animation: slideIn 0.3s ease; max-width: 350px; font-size: 14px; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+        .tab { display: none; }
+        .tab.active { display: block; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 12px; }
+        .tab-btn { background: none; border: none; padding: 8px 24px; font-weight: 600; cursor: pointer; border-radius: 60px; transition: all 0.2s; font-family: inherit; font-size: 14px; }
+        .tab-btn:hover { background: rgba(45,106,79,0.1); }
+        .tab-btn.active { background: #2d6a4f; color: white; box-shadow: 0 2px 8px rgba(45,106,79,0.3); }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 2000; }
+        .modal-content { background: white; border-radius: 28px; padding: 28px; max-width: 550px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .close-modal { float: right; font-size: 28px; cursor: pointer; background: none; border: none; color: #666; transition: all 0.2s; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .close-modal:hover { background: #f0f0f0; color: #000; }
+        .chart-container { max-height: 280px; margin-top: 20px; }
+        .login-container { max-width: 420px; margin: 60px auto; }
         .error { color: #dc2626; margin-top: 12px; text-align: center; font-size: 14px; }
-        .success { color: #2d6a4f; margin-top: 12px; text-align: center; font-size: 14px; }
+        .badge { background: #ef4444; color: white; font-size: 11px; border-radius: 60px; padding: 2px 8px; margin-left: 8px; }
+        @media (max-width: 700px) { body { padding: 12px; } .card { padding: 16px; } .tab-btn { padding: 6px 16px; font-size: 12px; } }
     </style>
 </head>
 <body>
-<div class="card">
-    <h1>🏆 ОКОИНЫ</h1>
-    <input type="text" id="login" placeholder="Логин" autocomplete="off">
-    <input type="password" id="password" placeholder="Пароль" onkeypress="if(event.key==='Enter') doLogin()">
-    <button onclick="doLogin()">Войти</button>
-    <div id="message"></div>
-</div>
+<div id="app"></div>
 
 <script>
-    const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
+// ==================== КОНФИГУРАЦИЯ ====================
+const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
 
-    async function doLogin() {
-        const login = document.getElementById('login').value.trim();
-        const password = document.getElementById('password').value;
-        const msgDiv = document.getElementById('message');
-        
-        if (!login || !password) {
-            msgDiv.innerHTML = '<span class="error">Введите логин и пароль</span>';
-            return;
-        }
-        
-        msgDiv.innerHTML = '<span class="success">Проверяем...</span>';
-        
-        try {
-            const url = `${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(password)}`;
-            const response = await fetch(url, {
-                headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-                }
-            });
-            
-            const data = await response.json();
-            console.log('Ответ сервера:', data);
-            
-            if (data && data.length > 0) {
-                const user = data[0];
-                if (user.status === 'archived') {
-                    msgDiv.innerHTML = '<span class="error">Аккаунт архивирован</span>';
-                    return;
-                }
-                msgDiv.innerHTML = `<span class="success">✅ Добро пожаловать, ${user.name}!</span>`;
-                // Сохраняем пользователя
-                localStorage.setItem('oko_user', JSON.stringify(user));
-                // Показываем кнопку выхода и приветствие
-                document.querySelector('.card').innerHTML = `
-                    <h1>🏆 ОКОИНЫ</h1>
-                    <div style="text-align:center; padding:20px;">
-                        <p>✅ Вы вошли как <strong>${user.name}</strong></p>
-                        <p>Роль: ${user.role === 'manager' ? 'Менеджер' : 'Сотрудник'}</p>
-                        <p>⭐ Рейтинг: ${user.rating} | 💰 Баланс: ${user.points} ОКОИНОВ</p>
-                        <button onclick="doLogout()" style="margin-top:20px;">Выйти</button>
-                    </div>
-                `;
-            } else {
-                msgDiv.innerHTML = '<span class="error">Неверный логин или пароль</span>';
+let currentUser = null;
+let employees = [];
+let prizes = [];
+let allHistory = [];
+let achievements = [];
+let levelConfig = null;
+let activeTab = 'main';
+let dashboardChart = null;
+
+// ==================== ВСПОМОГАТЕЛЬНЫЕ ====================
+function showToast(msg, isError = false) {
+    const toast = document.createElement('div');
+    toast.className = 'notification';
+    toast.innerHTML = msg;
+    if (isError) toast.style.background = '#fee2e2';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function getFullName(user) {
+    return `${user.name} ${user.surname || ''}`.trim();
+}
+
+function getLevel(rating) {
+    if (!levelConfig) return { name: 'Бронза', emoji: '🥉', color: 'bronze' };
+    const levels = Object.values(levelConfig);
+    for (let l of levels) {
+        if (rating >= l.min && rating <= l.max) return l;
+    }
+    return levels[0];
+}
+
+function getLevelBadge(rating) {
+    const l = getLevel(rating);
+    return `<span class="level-badge level-${l.color}">${l.emoji} ${l.name}</span>`;
+}
+
+async function apiFetch(url, options = {}) {
+    try {
+        const res = await fetch(url, {
+            ...options,
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                ...options.headers
             }
-        } catch (err) {
-            console.error('Ошибка:', err);
-            msgDiv.innerHTML = '<span class="error">Ошибка соединения с сервером</span>';
-        }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    } catch(e) {
+        console.error('API Error:', e);
+        return null;
     }
-    
-    function doLogout() {
-        localStorage.removeItem('oko_user');
-        location.reload();
+}
+
+// ==================== ЗАГРУЗКА ДАННЫХ ====================
+async function loadLevels() {
+    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.levels`);
+    if (data && data.length && data[0].value) {
+        levelConfig = data[0].value;
+    } else {
+        levelConfig = {
+            bronze: { name: 'Бронза', emoji: '🥉', min: 0, max: 99, color: 'bronze' },
+            silver: { name: 'Серебро', emoji: '🥈', min: 100, max: 299, color: 'silver' },
+            gold: { name: 'Золото', emoji: '🥇', min: 300, max: 499, color: 'gold' },
+            platinum: { name: 'Платина', emoji: '💎', min: 500, max: 999999, color: 'platinum' }
+        };
     }
+}
+
+async function loadAllData() {
+    if (!currentUser) return;
+    await loadLevels();
+    const [empData, prizeData, histData, achData] = await Promise.all([
+        apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/prizes?order=cost.asc`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/history?order=date.desc`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`)
+    ]);
+    if (empData) employees = empData;
+    if (prizeData) prizes = prizeData;
+    if (histData) allHistory = histData;
+    if (achData) achievements = achData;
+}
+
+// ==================== АУТЕНТИФИКАЦИЯ ====================
+async function doLogin() {
+    const login = document.getElementById('loginLogin').value.trim();
+    const password = document.getElementById('loginPass').value;
+    const errorDiv = document.getElementById('errorMsg');
+    if (!login || !password) { errorDiv.innerText = 'Введите логин и пароль'; return; }
     
-    // Проверяем, есть ли сохранённый пользователь
-    const savedUser = localStorage.getItem('oko_user');
-    if (savedUser) {
-        try {
-            const user = JSON.parse(savedUser);
-            document.querySelector('.card').innerHTML = `
-                <h1>🏆 ОКОИНЫ</h1>
-                <div style="text-align:center; padding:20px;">
-                    <p>✅ Вы вошли как <strong>${user.name}</strong></p>
-                    <p>Роль: ${user.role === 'manager' ? 'Менеджер' : 'Сотрудник'}</p>
-                    <p>⭐ Рейтинг: ${user.rating} | 💰 Баланс: ${user.points} ОКОИНОВ</p>
-                    <button onclick="doLogout()" style="margin-top:20px;">Выйти</button>
+    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(password)}`);
+    if (data && data.length) {
+        currentUser = data[0];
+        if (currentUser.status === 'archived') { errorDiv.innerText = 'Аккаунт архивирован'; return; }
+        localStorage.setItem('oko_current_user', JSON.stringify(currentUser));
+        await loadAllData();
+        renderApp();
+        showToast(`Добро пожаловать, ${getFullName(currentUser)} 🎉`);
+    } else {
+        errorDiv.innerText = 'Неверный логин или пароль';
+    }
+}
+
+function doLogout() {
+    currentUser = null;
+    localStorage.removeItem('oko_current_user');
+    renderApp();
+}
+
+// ==================== ФОТО (STORAGE) ====================
+async function updateUserPhoto(userId, file) {
+    if (!file || !file.type.startsWith('image/')) {
+        showToast('Выберите изображение', true);
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        showToast('Файл не более 2 МБ', true);
+        return;
+    }
+    try {
+        showToast('Загрузка фото...');
+        const ext = file.name.split('.').pop();
+        const fileName = `${userId}_${Date.now()}.${ext}`;
+        
+        const uploadUrl = `${SUPABASE_URL}/storage/v1/object/avatars/${fileName}`;
+        const uploadRes = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+            body: file
+        });
+        if (!uploadRes.ok) throw new Error('Ошибка загрузки');
+        
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/avatars/${fileName}`;
+        await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ photo: publicUrl })
+        });
+        
+        if (currentUser.id === userId) currentUser.photo = publicUrl;
+        const emp = employees.find(e => e.id === userId);
+        if (emp) emp.photo = publicUrl;
+        
+        showToast('Фото обновлено! ✅');
+        renderApp();
+    } catch(e) {
+        console.error(e);
+        showToast('Ошибка загрузки фото', true);
+    }
+}
+
+// ==================== ОПЕРАЦИИ С БАЛЛАМИ ====================
+async function updatePoints(empId, delta) {
+    let reason = prompt('Причина:', delta > 0 ? '🎯 Бонус' : '⚠️ Замечание');
+    if (!reason) return;
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    
+    const newPoints = emp.points + delta;
+    const newRating = delta > 0 ? emp.rating + delta : emp.rating;
+    
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ points: newPoints, rating: newRating })
+    });
+    
+    await apiFetch(`${SUPABASE_URL}/rest/v1/history`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: empId, reason, delta })
+    });
+    
+    emp.points = newPoints;
+    emp.rating = newRating;
+    if (currentUser.id === empId) { currentUser.points = newPoints; currentUser.rating = newRating; }
+    allHistory.unshift({ date: new Date().toISOString(), user_id: empId, reason, delta });
+    
+    showToast(`${delta > 0 ? '✅ Начислено' : '📤 Списано'} ${Math.abs(delta)} ОКОИНОВ (${reason})`);
+    renderApp();
+}
+
+// ==================== УПРАВЛЕНИЕ СОТРУДНИКАМИ ====================
+async function addUser(name, surname, login, password, points) {
+    if (employees.find(e => e.login === login)) { alert('Логин занят'); return; }
+    const newUser = { name, surname, login, password, role: 'employee', points: parseInt(points), rating: parseInt(points), photo: '', email: '', status: 'active' };
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users`, { method: 'POST', body: JSON.stringify(newUser) });
+    employees = await apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
+    showToast(`➕ Сотрудник ${name} ${surname} добавлен`);
+    renderApp();
+}
+
+async function archiveUser(id) {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    const newStatus = emp.status === 'archived' ? 'active' : 'archived';
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+    employees = await apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
+    showToast(newStatus === 'archived' ? '📦 Сотрудник архивирован' : '🔄 Сотрудник восстановлен');
+    renderApp();
+}
+
+async function updateUserEmail(id, email) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ email }) });
+    const emp = employees.find(e => e.id === id);
+    if (emp) emp.email = email;
+    if (currentUser.id === id) currentUser.email = email;
+    showToast('✉️ Email обновлён');
+    renderApp();
+}
+
+async function updateUserPoints(id, newPoints) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ points: newPoints, rating: newPoints }) });
+    const emp = employees.find(e => e.id === id);
+    if (emp) { emp.points = newPoints; emp.rating = newPoints; }
+    if (currentUser.id === id) { currentUser.points = newPoints; currentUser.rating = newPoints; }
+    showToast('💰 Баланс обновлён');
+    renderApp();
+}
+
+async function changePassword(oldPwd, newPwd) {
+    if (currentUser.password !== oldPwd) { alert('Неверный старый пароль'); return false; }
+    if (newPwd.length < 8 || !/[A-Z]/.test(newPwd) || !/[0-9]/.test(newPwd) || !/[!@#$%^&*]/.test(newPwd)) {
+        alert('Пароль: мин 8 символов, заглавная буква, цифра, спецсимвол');
+        return false;
+    }
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${currentUser.id}`, { method: 'PATCH', body: JSON.stringify({ password: newPwd }) });
+    currentUser.password = newPwd;
+    alert('🔑 Пароль изменён');
+    return true;
+}
+
+async function resetUserPassword(userId) {
+    const newPassword = 'OKOin2024!';
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, { method: 'PATCH', body: JSON.stringify({ password: newPassword }) });
+    const emp = employees.find(e => e.id === userId);
+    if (emp) emp.password = newPassword;
+    showToast(`🔐 Пароль сброшен на: ${newPassword}`);
+}
+
+// ==================== ДОСТИЖЕНИЯ ====================
+async function addAchievement(userId, text) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/achievements`, { method: 'POST', body: JSON.stringify({ user_id: userId, text }) });
+    achievements = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
+    showToast('🌟 Достижение добавлено');
+    renderApp();
+}
+
+async function deleteAchievement(id) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
+    achievements = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
+    renderApp();
+}
+
+async function editAchievement(id, newText) {
+    if (!newText) return;
+    await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ text: newText }) });
+    achievements = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
+    showToast('✏️ Достижение обновлено');
+    renderApp();
+}
+
+// ==================== ПРИЗЫ ====================
+async function addPrize(name, cost, desc, conditions, imageUrl) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`, { method: 'POST', body: JSON.stringify({ name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl }) });
+    prizes = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?order=cost.asc`);
+    showToast(`🎁 Приз "${name}" добавлен`);
+    renderApp();
+}
+
+async function editPrize(id, name, cost, desc, conditions, imageUrl) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl }) });
+    prizes = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?order=cost.asc`);
+    showToast('✏️ Приз изменён');
+    renderApp();
+}
+
+async function deletePrize(id) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
+    prizes = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?order=cost.asc`);
+    showToast('🗑️ Приз удалён');
+    renderApp();
+}
+
+function showPrizeModal(prize) {
+    const modal = document.getElementById('prizeModal');
+    const content = document.getElementById('modalContent');
+    content.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="color:#2d6a4f;">${prize.name}</h2>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div style="margin-bottom:16px;"><strong>📖 Описание:</strong><br>${(prize.description || '').replace(/\n/g, '<br>')}</div>
+        <div style="margin-bottom:16px;"><strong>💰 Стоимость:</strong> ${prize.cost} ОКОИНОВ</div>
+        <div><strong>📌 Условия получения:</strong><br>${(prize.conditions || 'Нет дополнительных условий').replace(/\n/g, '<br>')}</div>
+        ${prize.image_url ? `<div style="margin-top:16px;"><img src="${prize.image_url}" style="max-width:100%; border-radius:16px;"></div>` : ''}
+    `;
+    modal.style.display = 'flex';
+    modal.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
+    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+}
+
+// ==================== ПРОФИЛЬ СОТРУДНИКА ====================
+function showEmployeeProfile(empId) {
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    const empHistory = allHistory.filter(h => h.user_id === empId).slice(0,30);
+    const empAchievements = achievements.filter(a => a.user_id === empId);
+    const modal = document.getElementById('prizeModal');
+    const content = document.getElementById('modalContent');
+    content.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="color:#2d6a4f;">👤 ${getFullName(emp)}</h2>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px; padding:12px; background:#f0fdf4; border-radius:20px;">
+            <div><strong>💰 Баланс:</strong> ${emp.points} ОКОИНОВ</div>
+            <div><strong>⭐ Рейтинг:</strong> ${emp.rating} ${getLevelBadge(emp.rating)}</div>
+            <div><strong>📧 Email:</strong> ${emp.email || 'не указан'}</div>
+        </div>
+        <h3 style="margin-top:16px;">📜 История операций</h3>
+        ${empHistory.length === 0 ? '<p style="color:#888;">Нет операций</p>' : empHistory.map(h => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><small>${new Date(h.date).toLocaleString()}</small><br>${h.reason}: <strong>${h.delta > 0 ? '+' : ''}${h.delta}</strong></div>`).join('')}
+        <h3 style="margin-top:16px;">🌟 Достижения</h3>
+        ${empAchievements.length === 0 ? '<p style="color:#888;">Нет достижений</p>' : empAchievements.map(a => `<div style="padding:6px 0;"><small>${new Date(a.date).toLocaleString()}</small><br>✨ ${a.text}</div>`).join('')}
+    `;
+    modal.style.display = 'flex';
+    modal.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
+    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+}
+
+// ==================== ЭКСПОРТ В EXCEL ====================
+function exportToExcel() {
+    const data = [['ID', 'Имя', 'Фамилия', 'Логин', 'Баланс (ОКОИНЫ)', 'Рейтинг', 'Email', 'Статус']];
+    employees.forEach(e => data.push([e.id, e.name, e.surname || '', e.login, e.points, e.rating, e.email || '', e.status]));
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Сотрудники');
+    XLSX.writeFile(wb, `okoiny_export_${new Date().toISOString().slice(0,19)}.xlsx`);
+    showToast('📎 Экспорт завершён');
+}
+
+// ==================== ДАШБОРД ====================
+function renderDashboard() {
+    const container = document.getElementById('dashboardContent');
+    if (!container) return;
+    const activeEmps = employees.filter(e => e.status !== 'archived');
+    const totalPoints = activeEmps.reduce((s,e) => s + e.points, 0);
+    const totalRating = activeEmps.reduce((s,e) => s + e.rating, 0);
+    const avgRating = activeEmps.length ? Math.round(totalRating / activeEmps.length) : 0;
+    const topEmployees = [...activeEmps].sort((a,b) => b.rating - a.rating).slice(0,10);
+    
+    const last7Days = [];
+    const dailyTotals = {};
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const key = d.toISOString().slice(0,10);
+        last7Days.push(key.slice(5));
+        dailyTotals[key] = 0;
+    }
+    allHistory.forEach(h => {
+        const date = h.date.slice(0,10);
+        if (dailyTotals[date] !== undefined && h.delta > 0) dailyTotals[date] += h.delta;
+    });
+    const chartData = last7Days.map(d => dailyTotals[d] || 0);
+    
+    container.innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card"><div style="font-size:32px;">👥</div><div style="font-size:28px; font-weight:800;">${activeEmps.length}</div><div>Сотрудников</div></div>
+            <div class="stat-card"><div style="font-size:32px;">💰</div><div style="font-size:28px; font-weight:800;">${totalPoints}</div><div>Всего ОКОИНОВ</div></div>
+            <div class="stat-card"><div style="font-size:32px;">⭐</div><div style="font-size:28px; font-weight:800;">${totalRating}</div><div>Общий рейтинг</div></div>
+            <div class="stat-card"><div style="font-size:32px;">📊</div><div style="font-size:28px; font-weight:800;">${avgRating}</div><div>Средний рейтинг</div></div>
+        </div>
+        <div class="chart-container"><canvas id="dashboardCanvas" style="max-height:250px;"></canvas></div>
+        <h4 style="margin-top:20px;">🏆 Топ-10 сотрудников</h4>
+        ${topEmployees.map((e,i) => `<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #eee;"><span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} ${getFullName(e)}</span><span style="font-weight:600;">⭐ ${e.rating}</span></div>`).join('')}
+    `;
+    
+    const ctx = document.getElementById('dashboardCanvas')?.getContext('2d');
+    if (ctx) {
+        if (dashboardChart) dashboardChart.destroy();
+        dashboardChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: last7Days, datasets: [{ label: 'Начислено ОКОИНОВ', data: chartData, borderColor: '#2d6a4f', backgroundColor: 'rgba(45,106,79,0.1)', tension: 0.3, fill: true }] },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' } } }
+        });
+    }
+}
+
+// ==================== НАСТРОЙКА УРОВНЕЙ ====================
+function renderLevelSettings() {
+    const container = document.getElementById('levelSettingsContent');
+    if (!container || !levelConfig) return;
+    container.innerHTML = `
+        <div class="card">
+            <h3>⚙️ Настройка уровней рейтинга</h3>
+            <p style="color:#666; margin-bottom:16px;">Изменения применяются для всех пользователей</p>
+            ${Object.entries(levelConfig).map(([key, lvl]) => `
+                <div style="margin-bottom:16px; padding:16px; background:#f8fafc; border-radius:20px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                        <input type="text" value="${lvl.name}" data-level="${key}" data-field="name" placeholder="Название" style="width:110px;">
+                        <input type="text" value="${lvl.emoji}" data-level="${key}" data-field="emoji" placeholder="Эмодзи" style="width:70px;">
+                        <input type="number" value="${lvl.min}" data-level="${key}" data-field="min" placeholder="Мин" style="width:80px;">
+                        <input type="number" value="${lvl.max}" data-level="${key}" data-field="max" placeholder="Макс" style="width:80px;">
+                        <select data-level="${key}" data-field="color" style="padding:8px; border-radius:60px;">
+                            <option value="bronze" ${lvl.color==='bronze'?'selected':''}>Бронза</option>
+                            <option value="silver" ${lvl.color==='silver'?'selected':''}>Серебро</option>
+                            <option value="gold" ${lvl.color==='gold'?'selected':''}>Золото</option>
+                            <option value="platinum" ${lvl.color==='platinum'?'selected':''}>Платина</option>
+                        </select>
+                    </div>
                 </div>
-            `;
-        } catch(e) {}
+            `).join('')}
+            <button class="btn btn-primary" id="saveLevelsBtn">💾 Сохранить глобально</button>
+        </div>
+    `;
+    document.querySelectorAll('[data-level]').forEach(el => {
+        el.addEventListener('change', (e) => {
+            const key = el.dataset.level;
+            const field = el.dataset.field;
+            if (levelConfig[key]) levelConfig[key][field] = ['min','max'].includes(field) ? parseInt(el.value) : el.value;
+        });
+    });
+    document.getElementById('saveLevelsBtn')?.addEventListener('click', async () => {
+        await apiFetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.levels`, {
+            method: 'PATCH',
+            body: JSON.stringify({ value: levelConfig })
+        });
+        showToast('Настройки уровней сохранены для всех');
+        renderApp();
+    });
+}
+
+// ==================== ОСНОВНОЙ ИНТЕРФЕЙС ====================
+function setActiveTab(tab) { activeTab = tab; renderApp(); }
+
+function renderApp() {
+    if (!currentUser) {
+        document.getElementById('app').innerHTML = `
+            <div class="login-container">
+                <div class="card" style="text-align:center;">
+                    <h1 style="background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom:24px;">🏆 ОКОИНЫ</h1>
+                    <input type="text" id="loginLogin" placeholder="Логин" style="width:100%; margin-bottom:12px;">
+                    <input type="password" id="loginPass" placeholder="Пароль" style="width:100%; margin-bottom:12px;" onkeypress="if(event.key==='Enter') doLogin()">
+                    <button class="btn btn-primary" style="width:100%;" onclick="doLogin()">Войти</button>
+                    <div id="errorMsg" class="error"></div>
+                </div>
+            </div>
+        `;
+        return;
     }
+    
+    const isManager = currentUser.role === 'manager';
+    const activeEmployees = employees.filter(e => e.status !== 'archived');
+    const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
+    const myHistory = allHistory.filter(h => h.user_id === currentUser.id).slice(0,50);
+    
+    const html = `
+        <div class="container">
+            <div class="card flex">
+                <h1 style="background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent;">🏆 ОКОИНЫ</h1>
+                <div class="flex">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar" onerror="this.onerror=null;this.src='';">` : '<div class="avatar" style="display:flex; align-items:center; justify-content:center;">👤</div>'}
+                        <div><strong>${getFullName(currentUser)}</strong><br>⭐ ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-secondary" onclick="doLogout()">🚪 Выйти</button>
+                        <button class="btn btn-secondary" id="changePwdBtn">🔑 Сменить пароль</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-buttons">
+                <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">🏠 Главная</button>
+                ${isManager ? '<button class="tab-btn" data-tab="dashboard">📊 Дашборд</button>' : ''}
+                ${isManager ? '<button class="tab-btn" data-tab="users">👥 Управление</button>' : ''}
+                ${isManager ? '<button class="tab-btn" data-tab="prizes">🎁 Призы (CRUD)</button>' : ''}
+                ${isManager ? '<button class="tab-btn" data-tab="levels">⚙️ Уровни</button>' : ''}
+                ${!isManager ? '<button class="tab-btn" data-tab="achievements">🌟 Достижения</button>' : ''}
+                ${!isManager ? '<button class="tab-btn" data-tab="history">📜 История</button>' : ''}
+                <button class="tab-btn" data-tab="profile">👤 Профиль</button>
+            </div>
+            
+            <!-- Главная -->
+            <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>👥 Команда <span style="font-size:12px; font-weight:normal;">(нажмите для просмотра)</span></h3>
+                        ${activeEmployees.map(emp => `
+                            <div class="employee-card" onclick="showEmployeeProfile(${emp.id})">
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    ${emp.photo ? `<img src="${emp.photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" onerror="this.onerror=null;this.src='';">` : '<div style="width:40px;height:40px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;">👤</div>'}
+                                    <div><strong>${getFullName(emp)}</strong> ${getLevelBadge(emp.rating)}<br>💰 ${emp.points} ОКОИНОВ</div>
+                                </div>
+                                ${isManager ? `
+                                    <div onclick="event.stopPropagation()" style="display:flex; gap:6px;">
+                                        <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 5)">+5</button>
+                                        <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 10)">+10</button>
+                                        <button class="btn btn-warning" onclick="let a=prompt('Сумма списания:'); if(a && !isNaN(a)) updatePoints(${emp.id}, -parseInt(a))">-</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                        ${isManager ? '<div style="margin-top:16px;"><button class="btn btn-primary" id="addUserBtn">➕ Добавить сотрудника</button></div>' : ''}
+                    </div>
+                    <div class="card">
+                        <h3>🎁 Призы</h3>
+                        ${prizes.map(p => `<div class="prize-card" onclick="showPrizeModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br>${(p.description || '').substring(0, 50)}${(p.description || '').length > 50 ? '...' : ''}</div><div><span class="level-badge level-gold">💰 ${p.cost} ОКОИНОВ</span></div></div>`).join('')}
+                        ${!isManager ? `<div style="margin-top:16px; background:#d1fae5; padding:12px; border-radius:20px;">🎯 Доступно призов: ${prizes.filter(p => p.cost <= currentUser.points).length}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            ${isManager ? `
+            <div id="tab-dashboard" class="tab ${activeTab === 'dashboard' ? 'active' : ''}"><div id="dashboardContent"></div></div>
+            
+            <div id="tab-users" class="tab ${activeTab === 'users' ? 'active' : ''}">
+                <div class="card">
+                    <h3>📋 Управление сотрудниками</h3>
+                    ${employees.map(u => `
+                        <div class="employee-card" onclick="showEmployeeProfile(${u.id})">
+                            <div><strong>${getFullName(u)}</strong> (${u.login})<br>💰 ${u.points} ОКОИНОВ | ⭐ ${u.rating}<br>📧 ${u.email || '-'}</div>
+                            <div onclick="event.stopPropagation()" style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button class="btn btn-secondary" onclick="updateUserPoints(${u.id}, parseInt(prompt('Новый баланс:', ${u.points})))">💰 Баланс</button>
+                                <button class="btn btn-secondary" onclick="updateUserEmail(${u.id}, prompt('Новый email:'))">✉️ Email</button>
+                                <button class="btn btn-warning" onclick="resetUserPassword(${u.id})">🔑 Сброс пароля</button>
+                                <button class="btn btn-danger" onclick="archiveUser(${u.id})">${u.status === 'archived' ? '🔄 Восстановить' : '📦 Архив'}</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                    <div style="margin-top:20px;"><button class="btn btn-primary" id="exportExcelBtn">📎 Экспорт в Excel</button></div>
+                </div>
+            </div>
+            
+            <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
+                <div class="card">
+                    <div class="flex"><h3>🎁 Управление призами</h3><button class="btn btn-primary" id="addPrizeBtn">➕ Добавить приз</button></div>
+                    ${prizes.map(p => `
+                        <div class="prize-card">
+                            <div><strong>${p.name}</strong><br>${(p.description || '').substring(0, 50)}<br>💰 ${p.cost} ОКОИНОВ</div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="btn btn-secondary" onclick="editPrize(${p.id}, prompt('Название', '${p.name.replace(/'/g, "\\'")}'), prompt('Стоимость', ${p.cost}), prompt('Описание', '${(p.description || '').replace(/'/g, "\\'")}'), prompt('Условия', '${(p.conditions || '').replace(/'/g, "\\'")}'), prompt('URL фото', '${(p.image_url || '').replace(/'/g, "\\'")}'))">✏️</button>
+                                <button class="btn btn-danger" onclick="deletePrize(${p.id})">🗑️</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <div id="tab-levels" class="tab ${activeTab === 'levels' ? 'active' : ''}"><div id="levelSettingsContent"></div></div>
+            ` : `
+            <div id="tab-achievements" class="tab ${activeTab === 'achievements' ? 'active' : ''}">
+                <div class="card">
+                    <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn btn-primary" id="addAchievementBtn">➕ Добавить</button></div>
+                    ${myAchievements.length === 0 ? '<p style="text-align:center; color:#888; padding:20px;">Пока нет достижений. Добавьте первое!</p>' : 
+                        myAchievements.map(a => `
+                            <div class="achievement-item">
+                                <div><small>${new Date(a.date).toLocaleString()}</small><div style="margin-top:4px;">✨ ${a.text}</div></div>
+                                <div style="display:flex; gap:6px;">
+                                    <button class="btn btn-secondary" onclick="editAchievement(${a.id}, prompt('Новый текст:', '${a.text.replace(/'/g, "\\'")}'))">✏️</button>
+                                    <button class="btn btn-danger" onclick="deleteAchievement(${a.id})">🗑️</button>
+                                </div>
+                            </div>
+                        `).join('')
+                    }
+                </div>
+            </div>
+            
+            <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
+                <div class="card">
+                    <h3>📜 История операций</h3>
+                    ${myHistory.length === 0 ? '<p style="text-align:center; color:#888; padding:20px;">Нет операций. Менеджер ещё не начислял баллы.</p>' :
+                        myHistory.map(h => `
+                            <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                                <small style="color:#666;">${new Date(h.date).toLocaleString()}</small><br>
+                                <strong>${h.reason}</strong>: <span style="color:${h.delta > 0 ? '#2d6a4f' : '#dc2626'}; font-weight:600;">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ
+                            </div>
+                        `).join('')
+                    }
+                </div>
+            </div>
+            `}
+            
+            <div id="tab-profile" class="tab ${activeTab === 'profile' ? 'active' : ''}">
+                <div class="card">
+                    <div style="display:flex; flex-wrap:wrap; gap:24px; align-items:center;">
+                        <div style="text-align:center;">
+                            ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar-large" onerror="this.onerror=null;this.src='';">` : '<div class="avatar-large" style="display:flex; align-items:center; justify-content:center; background:#e2e8f0; font-size:48px;">👤</div>'}
+                            <div style="margin-top:12px;">
+                                <label class="btn btn-secondary" style="cursor:pointer; display:inline-block;">📷 Загрузить фото
+                                    <input type="file" id="profilePhotoInput" accept="image/jpeg,image/png" style="display:none;">
+                                </label>
+                            </div>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="margin-bottom:12px;"><strong>ФИО:</strong> ${getFullName(currentUser)}</div>
+                            <div style="margin-bottom:12px;"><strong>⭐ Рейтинг:</strong> ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
+                            <div style="margin-bottom:12px;"><strong>💰 Баланс:</strong> ${currentUser.points} ОКОИНОВ</div>
+                            <div><strong>✉️ Email:</strong> ${currentUser.email || 'не указан'} <button class="btn btn-secondary" id="changeEmailBtn" style="margin-left:8px;">Изменить</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="prizeModal" class="modal"><div class="modal-content" id="modalContent"></div></div>
+    `;
+    
+    document.getElementById('app').innerHTML = html;
+    
+    // Обработчики событий
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
+    document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
+        const old = prompt('Старый пароль:'); const newp = prompt('Новый пароль (мин 8, заглавная, цифра, спецсимвол):');
+        if (old && newp) await changePassword(old, newp);
+    });
+    
+    if (!isManager) {
+        document.getElementById('addAchievementBtn')?.addEventListener('click', async () => {
+            const text = prompt('Текст достижения:'); if (text) await addAchievement(currentUser.id, text);
+        });
+        document.getElementById('changeEmailBtn')?.addEventListener('click', async () => {
+            const email = prompt('Новый email:', currentUser.email || ''); if (email !== null) await updateUserEmail(currentUser.id, email);
+        });
+        const photoInput = document.getElementById('profilePhotoInput');
+        if (photoInput) photoInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) updateUserPhoto(currentUser.id, e.target.files[0]);
+        });
+    }
+    
+    if (isManager) {
+        document.getElementById('addUserBtn')?.addEventListener('click', () => {
+            const name = prompt('Имя'); const surname = prompt('Фамилия'); const login = prompt('Логин');
+            const password = prompt('Пароль'); const points = parseInt(prompt('Начальные баллы', 0));
+            if (name && surname && login && password) addUser(name, surname, login, password, points);
+        });
+        document.getElementById('addPrizeBtn')?.addEventListener('click', () => {
+            const name = prompt('Название приза'); const cost = prompt('Стоимость в ОКОИНАХ');
+            const desc = prompt('Описание (можно с переносами)'); const conditions = prompt('Условия (можно с переносами)');
+            const img = prompt('URL фото (необязательно)');
+            if (name && cost) addPrize(name, cost, desc || '', conditions || '', img || '');
+        });
+        document.getElementById('exportExcelBtn')?.addEventListener('click', exportToExcel);
+        if (activeTab === 'dashboard') renderDashboard();
+        if (activeTab === 'levels') renderLevelSettings();
+    }
+}
+
+// ==================== ЗАПУСК ====================
+const savedUser = localStorage.getItem('oko_current_user');
+if (savedUser) {
+    try {
+        currentUser = JSON.parse(savedUser);
+        loadAllData().then(() => renderApp());
+    } catch(e) { renderApp(); }
+} else {
+    renderApp();
+}
+
+// Глобальные функции для onclick
+window.doLogin = doLogin;
+window.updatePoints = updatePoints;
+window.archiveUser = archiveUser;
+window.updateUserEmail = updateUserEmail;
+window.updateUserPoints = updateUserPoints;
+window.addPrize = addPrize;
+window.editPrize = editPrize;
+window.deletePrize = deletePrize;
+window.showPrizeModal = showPrizeModal;
+window.addAchievement = addAchievement;
+window.deleteAchievement = deleteAchievement;
+window.editAchievement = editAchievement;
+window.resetUserPassword = resetUserPassword;
+window.showEmployeeProfile = showEmployeeProfile;
+window.exportToExcel = exportToExcel;
+window.changePassword = changePassword;
+window.updateUserPhoto = updateUserPhoto;
 </script>
 </body>
 </html>
