@@ -10,37 +10,50 @@
         .card { background: white; border-radius: 28px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         .btn { background: #2d6a4f; color: white; border: none; padding: 8px 20px; border-radius: 60px; cursor: pointer; font-weight: 600; }
         .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .btn-danger { background: #dc2626; color: white; }
         input { padding: 8px 16px; border-radius: 60px; border: 1px solid #cbd5e1; margin: 5px; }
         .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .employee { background: #f8fafc; border-radius: 20px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .employee, .prize-item { background: #f8fafc; border-radius: 20px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .prize-item { cursor: pointer; }
         .login-box { max-width: 400px; margin: 50px auto; text-align: center; }
         .error { color: red; margin-top: 10px; }
         .loading { text-align: center; padding: 40px; }
+        .tab { display: none; }
+        .tab.active { display: block; }
+        .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px; }
+        .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; }
+        .tab-btn.active { background: #2d6a4f; color: white; }
+        .prize-detail { font-size: 13px; color: #666; margin-top: 5px; }
     </style>
 </head>
 <body>
 <div id="app"></div>
 
 <script>
-// Конфигурация Supabase
+// Конфигурация
 const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
 
 let currentUser = null;
 let employees = [];
+let prizes = [];
+let activeTab = 'main';
 
-// Простой API запрос
-async function api(url) {
+// API запрос
+async function api(url, options = {}) {
     const res = await fetch(url, {
+        ...options,
         headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            ...options.headers
         }
     });
     return await res.json();
 }
 
-// Вход
+// ========== АУТЕНТИФИКАЦИЯ ==========
 async function login() {
     const login = document.getElementById('login').value.trim();
     const pass = document.getElementById('pass').value;
@@ -59,7 +72,8 @@ async function login() {
         if (data && data.length > 0) {
             currentUser = data[0];
             localStorage.setItem('user', JSON.stringify(currentUser));
-            await loadEmployees();
+            await Promise.all([loadEmployees(), loadPrizes()]);
+            activeTab = 'main';
             renderMain();
         } else {
             errDiv.innerText = 'Неверный логин или пароль';
@@ -70,20 +84,24 @@ async function login() {
     }
 }
 
-// Загрузка сотрудников
-async function loadEmployees() {
-    const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
-    if (data) employees = data;
-}
-
-// Выход
 function logout() {
     currentUser = null;
     localStorage.removeItem('user');
     renderLogin();
 }
 
-// Начисление баллов
+// ========== ЗАГРУЗКА ДАННЫХ ==========
+async function loadEmployees() {
+    const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
+    if (data) employees = data;
+}
+
+async function loadPrizes() {
+    const data = await api(`${SUPABASE_URL}/rest/v1/prizes`);
+    if (data) prizes = data;
+}
+
+// ========== БАЛЛЫ ==========
 async function addPoints(empId, delta) {
     const emp = employees.find(e => e.id === empId);
     if (!emp) return;
@@ -94,13 +112,8 @@ async function addPoints(empId, delta) {
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
     
-    await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
-        headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
@@ -115,7 +128,7 @@ async function addPoints(empId, delta) {
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
 }
 
-// Добавление сотрудника
+// ========== СОТРУДНИКИ ==========
 async function addEmployee() {
     const name = prompt('Имя');
     const surname = prompt('Фамилия');
@@ -125,13 +138,8 @@ async function addEmployee() {
     
     if (!name || !surname || !login || !password) return;
     
-    await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+    await api(`${SUPABASE_URL}/rest/v1/users`, {
         method: 'POST',
-        headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json'
-        },
         body: JSON.stringify({
             name, surname, login, password, role: 'employee',
             points, rating: points, photo: '', email: '', status: 'active'
@@ -143,7 +151,40 @@ async function addEmployee() {
     alert('Сотрудник добавлен');
 }
 
-// Отображение формы входа
+// ========== ПРИЗЫ (CRUD для менеджера) ==========
+async function addPrize() {
+    const name = prompt('Название приза');
+    const cost = parseInt(prompt('Стоимость в ОКОИНАХ'));
+    const desc = prompt('Описание');
+    const conditions = prompt('Условия получения');
+    
+    if (!name || !cost) return;
+    
+    await api(`${SUPABASE_URL}/rest/v1/prizes`, {
+        method: 'POST',
+        body: JSON.stringify({ name, cost, description: desc, conditions })
+    });
+    
+    await loadPrizes();
+    renderMain();
+    alert(`Приз "${name}" добавлен`);
+}
+
+async function deletePrize(id) {
+    if (!confirm('Удалить приз?')) return;
+    await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
+    await loadPrizes();
+    renderMain();
+    alert('Приз удалён');
+}
+
+function showPrizeInfo(prize) {
+    alert(`🎁 ${prize.name}\n\n📖 ${prize.description || 'Нет описания'}\n💰 ${prize.cost} ОКОИНОВ\n\n📌 Условия: ${prize.conditions || 'Нет'}`);
+}
+
+// ========== ОТРИСОВКА ==========
+function setActiveTab(tab) { activeTab = tab; renderMain(); }
+
 function renderLogin() {
     document.getElementById('app').innerHTML = `
         <div class="login-box">
@@ -158,12 +199,11 @@ function renderLogin() {
     `;
 }
 
-// Отображение основного интерфейса
 function renderMain() {
     const isManager = currentUser?.role === 'manager';
     const activeEmployees = employees.filter(e => e.status !== 'archived');
     
-    document.getElementById('app').innerHTML = `
+    const html = `
         <div style="max-width: 1200px; margin: 0 auto;">
             <div class="card flex">
                 <h1>🏆 ОКОИНЫ</h1>
@@ -173,24 +213,70 @@ function renderMain() {
                 </div>
             </div>
             
-            <div class="card">
-                <h3>👥 Команда</h3>
-                ${activeEmployees.map(emp => `
-                    <div class="employee">
-                        <div><strong>${emp.name} ${emp.surname || ''}</strong><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
-                        ${isManager ? `
-                            <div>
-                                <button class="btn btn-secondary" onclick="addPoints(${emp.id}, 5)">+5</button>
-                                <button class="btn btn-secondary" onclick="addPoints(${emp.id}, 10)">+10</button>
-                                <button class="btn btn-secondary" onclick="let a=prompt('Сумма'); if(a) addPoints(${emp.id}, -parseInt(a))">-</button>
-                            </div>
-                        ` : ''}
-                    </div>
-                `).join('')}
-                ${isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
+            <div class="tab-buttons">
+                <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">👥 Команда</button>
+                <button class="tab-btn ${activeTab === 'prizes' ? 'active' : ''}" data-tab="prizes">🎁 Призы</button>
+                ${isManager ? '<button class="tab-btn" data-tab="manage">⚙️ Управление</button>' : ''}
             </div>
+            
+            <!-- Вкладка: Команда -->
+            <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
+                <div class="card">
+                    <h3>👥 Команда</h3>
+                    ${activeEmployees.map(emp => `
+                        <div class="employee">
+                            <div><strong>${emp.name} ${emp.surname || ''}</strong><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
+                            ${isManager ? `
+                                <div>
+                                    <button class="btn btn-secondary" onclick="addPoints(${emp.id}, 5)">+5</button>
+                                    <button class="btn btn-secondary" onclick="addPoints(${emp.id}, 10)">+10</button>
+                                    <button class="btn btn-secondary" onclick="let a=prompt('Сумма'); if(a) addPoints(${emp.id}, -parseInt(a))">-</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                    ${isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
+                </div>
+            </div>
+            
+            <!-- Вкладка: Призы -->
+            <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
+                <div class="card">
+                    <h3>🎁 Призы</h3>
+                    ${prizes.map(p => `
+                        <div class="prize-item" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                            <div><strong>${p.name}</strong><br><span class="prize-detail">${p.description ? p.description.substring(0, 50) : ''}</span></div>
+                            <div>💰 ${p.cost} ОКОИНОВ</div>
+                        </div>
+                    `).join('')}
+                    ${prizes.length === 0 ? '<p style="color:#888;">Нет призов</p>' : ''}
+                </div>
+            </div>
+            
+            ${isManager ? `
+            <!-- Вкладка: Управление призами -->
+            <div id="tab-manage" class="tab ${activeTab === 'manage' ? 'active' : ''}">
+                <div class="card">
+                    <div class="flex"><h3>🎁 Управление призами</h3><button class="btn" onclick="addPrize()">➕ Добавить приз</button></div>
+                    ${prizes.map(p => `
+                        <div class="prize-item">
+                            <div><strong>${p.name}</strong><br>💰 ${p.cost} ОКОИНОВ</div>
+                            <div><button class="btn btn-danger" onclick="deletePrize(${p.id})">🗑️ Удалить</button></div>
+                        </div>
+                    `).join('')}
+                    ${prizes.length === 0 ? '<p>Нет призов</p>' : ''}
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
+    
+    document.getElementById('app').innerHTML = html;
+    
+    // Обработчики вкладок
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+    });
 }
 
 // Запуск
@@ -198,7 +284,7 @@ const saved = localStorage.getItem('user');
 if (saved) {
     try {
         currentUser = JSON.parse(saved);
-        loadEmployees().then(() => renderMain());
+        Promise.all([loadEmployees(), loadPrizes()]).then(() => renderMain());
     } catch(e) { renderLogin(); }
 } else {
     renderLogin();
@@ -209,6 +295,9 @@ window.login = login;
 window.logout = logout;
 window.addPoints = addPoints;
 window.addEmployee = addEmployee;
+window.addPrize = addPrize;
+window.deletePrize = deletePrize;
+window.showPrizeInfo = showPrizeInfo;
 </script>
 </body>
 </html>
