@@ -11,9 +11,10 @@
         .btn { background: #2d6a4f; color: white; border: none; padding: 8px 20px; border-radius: 60px; cursor: pointer; font-weight: 600; }
         .btn-secondary { background: #e2e8f0; color: #1e293b; }
         .btn-danger { background: #dc2626; color: white; }
+        .btn-small { padding: 4px 12px; font-size: 12px; }
         input { padding: 8px 16px; border-radius: 60px; border: 1px solid #cbd5e1; margin: 5px; }
         .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .employee, .prize-item { background: #f8fafc; border-radius: 20px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .employee, .prize-item, .achievement-item, .history-item { background: #f8fafc; border-radius: 20px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .prize-item { cursor: pointer; }
         .login-box { max-width: 400px; margin: 50px auto; text-align: center; }
         .error { color: red; margin-top: 10px; }
@@ -23,7 +24,9 @@
         .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; font-size: 14px; }
         .tab-btn.active { background: #2d6a4f; color: white; }
         .loading { text-align: center; padding: 20px; color: #666; }
-        .level { background: #fbbf24; padding: 2px 8px; border-radius: 60px; font-size: 11px; font-weight: 600; }
+        .history-date { font-size: 11px; color: #666; }
+        .history-delta-plus { color: #2d6a4f; font-weight: 600; }
+        .history-delta-minus { color: #dc2626; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -36,6 +39,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
 let currentUser = null;
 let employees = [];
 let prizes = [];
+let achievements = [];
+let history = [];
 let activeTab = 'main';
 let dataReady = false;
 
@@ -52,7 +57,7 @@ async function api(url, options = {}) {
     return await res.json();
 }
 
-// ========== ЗАГРУЗКА ДАННЫХ (ФОНОВАЯ) ==========
+// ========== ЗАГРУЗКА ДАННЫХ ==========
 async function loadEmployees() {
     const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
     if (data) employees = data;
@@ -63,8 +68,18 @@ async function loadPrizes() {
     if (data) prizes = data;
 }
 
+async function loadAchievements() {
+    const data = await api(`${SUPABASE_URL}/rest/v1/achievements`);
+    if (data) achievements = data;
+}
+
+async function loadHistory() {
+    const data = await api(`${SUPABASE_URL}/rest/v1/history`);
+    if (data) history = data;
+}
+
 async function loadAllData() {
-    await Promise.all([loadEmployees(), loadPrizes()]);
+    await Promise.all([loadEmployees(), loadPrizes(), loadAchievements(), loadHistory()]);
     dataReady = true;
     renderMain();
 }
@@ -88,8 +103,8 @@ async function login() {
         if (data && data.length > 0) {
             currentUser = data[0];
             localStorage.setItem('user', JSON.stringify(currentUser));
-            renderMain(); // Сразу показываем интерфейс (с загрузкой)
-            loadAllData(); // Грузим данные в фоне
+            renderMain();
+            loadAllData();
         } else {
             errDiv.innerText = 'Неверный логин или пароль';
         }
@@ -120,6 +135,11 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
+    await api(`${SUPABASE_URL}/rest/v1/history`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: empId, reason, delta })
+    });
+    
     emp.points = newPoints;
     emp.rating = newRating;
     if (currentUser.id === empId) {
@@ -127,6 +147,7 @@ async function addPoints(empId, delta) {
         currentUser.rating = newRating;
     }
     
+    await loadHistory();
     renderMain();
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
 }
@@ -152,6 +173,28 @@ async function addEmployee() {
     await loadEmployees();
     renderMain();
     alert('Сотрудник добавлен');
+}
+
+// ========== ДОСТИЖЕНИЯ ==========
+async function addAchievement() {
+    const text = prompt('Текст достижения:');
+    if (!text) return;
+    
+    await api(`${SUPABASE_URL}/rest/v1/achievements`, {
+        method: 'POST',
+        body: JSON.stringify({ user_id: currentUser.id, text })
+    });
+    
+    await loadAchievements();
+    renderMain();
+    alert('Достижение добавлено');
+}
+
+async function deleteAchievement(id) {
+    if (!confirm('Удалить достижение?')) return;
+    await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
+    await loadAchievements();
+    renderMain();
 }
 
 // ========== ПРИЗЫ ==========
@@ -228,6 +271,8 @@ function renderMain() {
     
     const isManager = currentUser?.role === 'manager';
     const activeEmployees = employees.filter(e => e.status !== 'archived');
+    const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
+    const myHistory = history.filter(h => h.user_id === currentUser.id).slice(0, 30);
     const isLoading = !dataReady;
     
     const html = `
@@ -244,6 +289,8 @@ function renderMain() {
             <div class="tab-buttons">
                 <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">👥 Команда</button>
                 <button class="tab-btn ${activeTab === 'prizes' ? 'active' : ''}" data-tab="prizes">🎁 Призы</button>
+                <button class="tab-btn ${activeTab === 'achievements' ? 'active' : ''}" data-tab="achievements">🌟 Достижения</button>
+                <button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" data-tab="history">📜 История</button>
                 ${isManager ? '<button class="tab-btn" data-tab="manage">⚙️ Управление</button>' : ''}
             </div>
             
@@ -257,9 +304,9 @@ function renderMain() {
                             <div><strong>${emp.name} ${emp.surname || ''}</strong><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
                             ${isManager ? `
                                 <div>
-                                    <button class="btn btn-secondary" onclick="addPoints(${emp.id}, 5)">+5</button>
-                                    <button class="btn btn-secondary" onclick="addPoints(${emp.id}, 10)">+10</button>
-                                    <button class="btn btn-secondary" onclick="let a=prompt('Сумма'); if(a) addPoints(${emp.id}, -parseInt(a))">-</button>
+                                    <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 5)">+5</button>
+                                    <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 10)">+10</button>
+                                    <button class="btn btn-secondary btn-small" onclick="let a=prompt('Сумма'); if(a) addPoints(${emp.id}, -parseInt(a))">-</button>
                                 </div>
                             ` : ''}
                         </div>
@@ -283,6 +330,38 @@ function renderMain() {
                 </div>
             </div>
             
+            <!-- Достижения -->
+            <div id="tab-achievements" class="tab ${activeTab === 'achievements' ? 'active' : ''}">
+                <div class="card">
+                    <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn" onclick="addAchievement()">➕ Добавить</button></div>
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
+                    ${!isLoading && myAchievements.map(a => `
+                        <div class="achievement-item">
+                            <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
+                            <div><button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button></div>
+                        </div>
+                    `).join('')}
+                    ${!isLoading && myAchievements.length === 0 ? '<p class="loading">Нет достижений. Добавьте первое!</p>' : ''}
+                </div>
+            </div>
+            
+            <!-- История -->
+            <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
+                <div class="card">
+                    <h3>📜 История операций</h3>
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
+                    ${!isLoading && myHistory.map(h => `
+                        <div class="history-item">
+                            <div>
+                                <span class="history-date">${new Date(h.date).toLocaleString()}</span><br>
+                                ${h.reason}: <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${!isLoading && myHistory.length === 0 ? '<p class="loading">Нет операций</p>' : ''}
+                </div>
+            </div>
+            
             ${isManager ? `
             <div id="tab-manage" class="tab ${activeTab === 'manage' ? 'active' : ''}">
                 <div class="card">
@@ -290,7 +369,7 @@ function renderMain() {
                     ${prizes.map(p => `
                         <div class="prize-item">
                             <div><strong>${p.name}</strong><br>💰 ${p.cost} ОКОИНОВ</div>
-                            <div><button class="btn btn-danger" onclick="deletePrize(${p.id})">🗑️ Удалить</button></div>
+                            <div><button class="btn btn-danger btn-small" onclick="deletePrize(${p.id})">🗑️ Удалить</button></div>
                         </div>
                     `).join('')}
                     ${prizes.length === 0 ? '<p>Нет призов</p>' : ''}
@@ -312,8 +391,8 @@ const saved = localStorage.getItem('user');
 if (saved) {
     try {
         currentUser = JSON.parse(saved);
-        renderMain(); // Показываем интерфейс сразу
-        loadAllData(); // Данные подгружаем в фоне
+        renderMain();
+        loadAllData();
     } catch(e) { renderLogin(); }
 } else {
     renderLogin();
@@ -327,6 +406,8 @@ window.addPrize = addPrize;
 window.deletePrize = deletePrize;
 window.showPrizeInfo = showPrizeInfo;
 window.changePassword = changePassword;
+window.addAchievement = addAchievement;
+window.deleteAchievement = deleteAchievement;
 </script>
 </body>
 </html>
