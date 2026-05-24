@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ОКОИНЫ — система мотивации</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #e0f0ea 0%, #c8dfd6 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card { background: rgba(255,255,255,0.95); border-radius: 28px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
+        .employee-card, .prize-card, .achievement-item { background: white; border-radius: 20px; padding: 14px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; cursor: pointer; transition: 0.2s; }
+        .employee-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .prize-card { cursor: pointer; }
+        .prize-card:hover { transform: translateY(-2px); }
+        .btn { padding: 8px 18px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background: #2d6a4f; color: white; }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .btn-warning { background: #f97316; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .level-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 60px; font-size: 12px; font-weight: 700; }
+        .level-bronze { background: #cd7f32; color: white; }
+        .level-silver { background: #94a3b8; color: white; }
+        .level-gold { background: #fbbf24; color: #1e293b; }
+        .level-platinum { background: #c084fc; color: white; }
+        input, textarea { padding: 8px 16px; border-radius: 20px; border: 1px solid #cbd5e1; background: white; font-family: inherit; }
+        textarea { min-height: 80px; resize: vertical; }
+        .avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #e2e8f0; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: rgba(255,255,255,0.7); border-radius: 24px; padding: 16px; text-align: center; }
+        .notification { position: fixed; bottom: 20px; right: 20px; background: white; padding: 12px 24px; border-radius: 60px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; animation: fadeIn 0.2s; }
+        .tab { display: none; }
+        .tab.active { display: block; }
+        .tab-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 12px; }
+        .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; }
+        .tab-btn.active { background: #2d6a4f; color: white; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 2000; }
+        .modal-content { background: white; border-radius: 28px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .close-modal { float: right; font-size: 28px; cursor: pointer; background: none; border: none; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .chart-container { max-height: 300px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div id="app">Загрузка...</div>
+<script>
+// ========== КОНФИГУРАЦИЯ ==========
+const SUPABASE_URL = 'https://ryyhpmeyqqgptwxmczqa.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_0BxkLpWWHDGPmxGdm31ywg_ZWGrjCf4';
+const STORAGE_BUCKET = 'avatars';
+
+let currentUser = null;
+let activeTab = 'main';
+let employees = [];
+let prizes = [];
+let allHistory = [];
+let achievements = [];
+let levelConfig = null;
+
+// ========== ПРОВЕРКА АВТОРИЗАЦИИ ==========
+const savedUser = localStorage.getItem('oko_current_user');
+if (!savedUser) {
+    window.location.href = 'index.html';
+} else {
+    try {
+        currentUser = JSON.parse(savedUser);
+    } catch(e) {
+        window.location.href = 'index.html';
+    }
+}
+
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+function showToast(msg, isError = false) {
+    const toast = document.createElement('div');
+    toast.className = 'notification';
+    toast.innerText = msg;
+    if (isError) toast.style.background = '#fee2e2';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function getUserLevel(rating) {
+    if (!levelConfig) return { name: 'Бронза', emoji: '🥉', color: 'bronze' };
+    const levels = Object.values(levelConfig);
+    for (let l of levels) {
+        if (rating >= l.min && rating <= l.max) return l;
+    }
+    return levels[0];
+}
+
+function getLevelBadge(rating) {
+    const l = getUserLevel(rating);
+    return `<span class="level-badge level-${l.color}">${l.emoji} ${l.name}</span>`;
+}
+
+function getFullName(emp) {
+    return `${emp.name} ${emp.surname || ''}`.trim();
+}
+
+async function apiFetch(url, options = {}) {
+    try {
+        const res = await fetch(url, {
+            ...options,
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                ...options.headers
+            }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+}
+
+// ========== ЗАГРУЗКА ДАННЫХ ==========
+async function loadLevels() {
+    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.levels`);
+    if (data && data.length && data[0].value) {
+        levelConfig = data[0].value;
+    } else {
+        levelConfig = {
+            bronze: { name: 'Бронза', emoji: '🥉', min: 0, max: 99, color: 'bronze' },
+            silver: { name: 'Серебро', emoji: '🥈', min: 100, max: 299, color: 'silver' },
+            gold: { name: 'Золото', emoji: '🥇', min: 300, max: 499, color: 'gold' },
+            platinum: { name: 'Платина', emoji: '💎', min: 500, max: 999999, color: 'platinum' }
+        };
+    }
+}
+
+async function loadAllData() {
+    if (!currentUser) return;
+    await loadLevels();
+    const [empData, prizeData, histData, achData] = await Promise.all([
+        apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/prizes`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/history`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/achievements`)
+    ]);
+    if (empData) employees = empData;
+    if (prizeData) prizes = prizeData;
+    if (histData) allHistory = histData.sort((a,b) => new Date(b.date) - new Date(a.date));
+    if (achData) achievements = achData;
+    renderApp();
+}
+
+// ========== ВЫХОД ==========
+function doLogout() {
+    localStorage.removeItem('oko_current_user');
+    window.location.href = 'index.html';
+}
+
+// ========== ЗАГРУЗКА ФОТО ==========
+async function uploadPhoto(file, userId) {
+    const ext = file.name.split('.').pop();
+    const fileName = `${userId}_${Date.now()}.${ext}`;
+    const url = `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${fileName}`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+        body: file
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${fileName}`;
+}
+
+async function updateUserPhoto(userId, file) {
+    try {
+        const photoUrl = await uploadPhoto(file, userId);
+        await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photo: photoUrl })
+        });
+        if (currentUser.id === userId) currentUser.photo = photoUrl;
+        const emp = employees.find(e => e.id === userId);
+        if (emp) emp.photo = photoUrl;
+        showToast('Фото обновлено');
+        renderApp();
+    } catch(e) {
+        showToast('Ошибка загрузки фото', true);
+    }
+}
+
+// ========== ОПЕРАЦИИ ==========
+async function updatePoints(empId, delta) {
+    let reason = prompt('Причина:', delta > 0 ? 'Бонус' : 'Замечание');
+    if (!reason) return;
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    const newPoints = emp.points + delta;
+    const newRating = delta > 0 ? emp.rating + delta : emp.rating;
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: newPoints, rating: newRating })
+    });
+    emp.points = newPoints;
+    emp.rating = newRating;
+    if (currentUser.id === empId) { currentUser.points = newPoints; currentUser.rating = newRating; }
+    await apiFetch(`${SUPABASE_URL}/rest/v1/history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: empId, reason, delta })
+    });
+    allHistory.unshift({ date: new Date().toISOString(), user_id: empId, reason, delta });
+    showToast(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
+    renderApp();
+}
+
+async function addUser(name, surname, login, password, points) {
+    if (employees.find(e => e.login === login)) { alert('Логин занят'); return; }
+    const newUser = { name, surname, login, password, role: 'employee', points: parseInt(points), rating: parseInt(points), photo: '', email: '', status: 'active' };
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+    });
+    employees.push(newUser);
+    showToast(`Сотрудник ${name} ${surname} добавлен`);
+    renderApp();
+}
+
+async function archiveUser(id) {
+    const idx = employees.findIndex(e => e.id === id);
+    if (idx === -1) return;
+    const newStatus = employees[idx].status === 'archived' ? 'active' : 'archived';
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+    });
+    employees[idx].status = newStatus;
+    showToast('Статус изменён');
+    renderApp();
+}
+
+async function updateUserEmail(id, email) {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+    });
+    emp.email = email;
+    if (currentUser.id === id) currentUser.email = email;
+    showToast('Email обновлён');
+    renderApp();
+}
+
+async function updateUserPoints(id, newPoints) {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: newPoints, rating: newPoints })
+    });
+    emp.points = newPoints;
+    emp.rating = newPoints;
+    if (currentUser.id === id) { currentUser.points = newPoints; currentUser.rating = newPoints; }
+    showToast('Баланс обновлён');
+    renderApp();
+}
+
+async function changePassword(oldPwd, newPwd) {
+    if (currentUser.password !== oldPwd) { alert('Неверный старый пароль'); return false; }
+    if (newPwd.length < 8 || !/[A-Z]/.test(newPwd) || !/[0-9]/.test(newPwd) || !/[!@#$%^&*]/.test(newPwd)) {
+        alert('Пароль: мин 8, заглавная, цифра, спецсимвол');
+        return false;
+    }
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${currentUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPwd })
+    });
+    currentUser.password = newPwd;
+    alert('Пароль изменён');
+    return true;
+}
+
+async function resetUserPassword(userId) {
+    const newPassword = 'OKOin2024!';
+    await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword })
+    });
+    const emp = employees.find(e => e.id === userId);
+    if (emp) emp.password = newPassword;
+    showToast(`Пароль сброшен на: ${newPassword}`);
+}
+
+async function addAchievement(userId, text) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/achievements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, text })
+    });
+    achievements.push({ id: Date.now(), user_id: userId, text, date: new Date().toISOString() });
+    showToast('Достижение добавлено');
+    renderApp();
+}
+
+async function deleteAchievement(id) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
+    achievements = achievements.filter(a => a.id !== id);
+    renderApp();
+}
+
+async function editAchievement(id, newText) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newText })
+    });
+    const ach = achievements.find(a => a.id === id);
+    if (ach) ach.text = newText;
+    showToast('Достижение обновлено');
+    renderApp();
+}
+
+async function addPrize(name, cost, desc, conditions, imageUrl) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl })
+    });
+    const fresh = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`);
+    if (fresh) prizes = fresh;
+    showToast(`Приз "${name}" добавлен`);
+    renderApp();
+}
+
+async function editPrize(id, name, cost, desc, conditions, imageUrl) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, cost: parseInt(cost), description: desc, conditions, image_url: imageUrl })
+    });
+    const fresh = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`);
+    if (fresh) prizes = fresh;
+    showToast('Приз изменён');
+    renderApp();
+}
+
+async function deletePrize(id) {
+    await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
+    prizes = prizes.filter(p => p.id !== id);
+    showToast('Приз удалён');
+    renderApp();
+}
+
+function showPrizeModal(prize) {
+    const modal = document.getElementById('prizeModal');
+    const content = document.getElementById('modalContent');
+    content.innerHTML = `
+        <div><button class="close-modal">&times;</button><h2>${prize.name}</h2></div>
+        <div><strong>📖 Описание:</strong><br>${(prize.description || '').replace(/\n/g, '<br>')}</div>
+        <div style="margin-top:12px;"><strong>💰 Стоимость:</strong> ${prize.cost} ОКОИНОВ</div>
+        <div style="margin-top:12px;"><strong>📌 Условия:</strong><br>${(prize.conditions || 'Нет').replace(/\n/g, '<br>')}</div>
+        ${prize.image_url ? `<div><img src="${prize.image_url}" style="max-width:100%; border-radius:16px;"></div>` : ''}
+    `;
+    modal.style.display = 'flex';
+    modal.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
+    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+}
+
+function showEmployeeProfile(empId) {
+    const emp = employees.find(e => e.id === empId);
+    if (!emp) return;
+    const empHistory = allHistory.filter(h => h.user_id === empId).slice(0,30);
+    const empAchievements = achievements.filter(a => a.user_id === empId);
+    const modal = document.getElementById('prizeModal');
+    const content = document.getElementById('modalContent');
+    content.innerHTML = `
+        <div><button class="close-modal">&times;</button><h2>👤 ${getFullName(emp)}</h2></div>
+        <div class="flex" style="margin:16px 0;">
+            <div>💰 Баланс: <strong>${emp.points} ОКОИНОВ</strong></div>
+            <div>⭐ Рейтинг: <strong>${emp.rating}</strong> ${getLevelBadge(emp.rating)}</div>
+            <div>📧 ${emp.email || 'email не указан'}</div>
+        </div>
+        <h3>📜 История операций</h3>
+        ${empHistory.map(h => `<div style="padding:6px 0; border-bottom:1px solid #eee;"><small>${new Date(h.date).toLocaleString()}</small><br>${h.reason}: <strong>${h.delta > 0 ? '+' : ''}${h.delta}</strong></div>`).join('') || 'Нет операций'}
+        <h3 style="margin-top:16px;">🌟 Достижения</h3>
+        ${empAchievements.map(a => `<div style="padding:6px 0;"><small>${new Date(a.date).toLocaleString()}</small><br>✨ ${a.text}</div>`).join('') || 'Нет достижений'}
+    `;
+    modal.style.display = 'flex';
+    modal.querySelector('.close-modal').onclick = () => modal.style.display = 'none';
+    window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+}
+
+function exportToExcel() {
+    const data = [
+        ['ID', 'Имя', 'Фамилия', 'Логин', 'Баланс (ОКОИНЫ)', 'Рейтинг', 'Email', 'Статус'],
+        ...employees.map(e => [e.id, e.name, e.surname || '', e.login, e.points, e.rating, e.email || '', e.status])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Сотрудники');
+    XLSX.writeFile(wb, `okoiny_export_${new Date().toISOString().slice(0,19)}.xlsx`);
+    showToast('Экспорт выполнен');
+}
+
+let dashboardChart = null;
+function renderDashboard() {
+    const container = document.getElementById('dashboardContent');
+    if (!container) return;
+    const activeEmps = employees.filter(e => e.status !== 'archived');
+    const totalPoints = activeEmps.reduce((s,e) => s + e.points, 0);
+    const totalRating = activeEmps.reduce((s,e) => s + e.rating, 0);
+    const avgRating = activeEmps.length ? Math.round(totalRating / activeEmps.length) : 0;
+    const topEmployees = [...activeEmps].sort((a,b) => b.rating - a.rating).slice(0,10);
+    const last30Days = [];
+    const dailyTotals = {};
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const key = d.toISOString().slice(0,10);
+        last30Days.push(key.slice(5));
+        dailyTotals[key] = 0;
+    }
+    allHistory.forEach(h => {
+        const date = h.date.slice(0,10);
+        if (dailyTotals[date] !== undefined && h.delta > 0) dailyTotals[date] += h.delta;
+    });
+    const chartData = last30Days.map(d => dailyTotals[d] || 0);
+    container.innerHTML = `
+        <div class="stats-grid">
+            <div class="stat-card"><div>👥</div><div style="font-size:28px;">${activeEmps.length}</div><div>Сотрудников</div></div>
+            <div class="stat-card"><div>💰</div><div style="font-size:28px;">${totalPoints}</div><div>Всего ОКОИНОВ</div></div>
+            <div class="stat-card"><div>⭐</div><div style="font-size:28px;">${totalRating}</div><div>Рейтинг</div></div>
+            <div class="stat-card"><div>📊</div><div style="font-size:28px;">${avgRating}</div><div>Средний рейтинг</div></div>
+        </div>
+        <div class="chart-container"><canvas id="dashboardCanvas" style="max-height:250px;"></canvas></div>
+        <h4 style="margin-top:20px;">🏆 Топ-10 сотрудников</h4>
+        ${topEmployees.map((e,i) => `<div class="flex" style="padding:8px 0; border-bottom:1px solid #eee;"><span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} ${getFullName(e)}</span><span>⭐ ${e.rating}</span></div>`).join('')}
+    `;
+    const ctx = document.getElementById('dashboardCanvas')?.getContext('2d');
+    if (ctx) {
+        if (dashboardChart) dashboardChart.destroy();
+        dashboardChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: last30Days, datasets: [{ label: 'Начислено ОКОИНОВ', data: chartData, borderColor: '#2d6a4f', tension: 0.3, fill: true }] },
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+    }
+}
+
+function renderLevelSettings() {
+    const container = document.getElementById('levelSettingsContent');
+    if (!container || !levelConfig) return;
+    container.innerHTML = `
+        <div class="card">
+            <h3>⚙️ Настройка уровней рейтинга (глобально для всех)</h3>
+            ${Object.entries(levelConfig).map(([key, lvl]) => `
+                <div style="margin-bottom:16px; padding:12px; background:#f8fafc; border-radius:20px;">
+                    <div class="flex">
+                        <input type="text" value="${lvl.name}" placeholder="Название" style="width:120px;" data-level="${key}" data-field="name">
+                        <input type="text" value="${lvl.emoji}" placeholder="Эмодзи" style="width:70px;" data-level="${key}" data-field="emoji">
+                        <input type="number" value="${lvl.min}" placeholder="Мин" style="width:80px;" data-level="${key}" data-field="min">
+                        <input type="number" value="${lvl.max}" placeholder="Макс" style="width:80px;" data-level="${key}" data-field="max">
+                        <select data-level="${key}" data-field="color">
+                            <option value="bronze" ${lvl.color==='bronze'?'selected':''}>Бронза</option>
+                            <option value="silver" ${lvl.color==='silver'?'selected':''}>Серебро</option>
+                            <option value="gold" ${lvl.color==='gold'?'selected':''}>Золото</option>
+                            <option value="platinum" ${lvl.color==='platinum'?'selected':''}>Платина</option>
+                        </select>
+                    </div>
+                </div>
+            `).join('')}
+            <button class="btn btn-primary" id="saveLevelsBtn">💾 Сохранить глобально</button>
+        </div>
+    `;
+    document.querySelectorAll('[data-level]').forEach(el => {
+        el.addEventListener('change', (e) => {
+            const key = el.dataset.level;
+            const field = el.dataset.field;
+            if (levelConfig[key]) levelConfig[key][field] = el.value;
+        });
+    });
+    document.getElementById('saveLevelsBtn')?.addEventListener('click', async () => {
+        await apiFetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.levels`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: levelConfig })
+        });
+        showToast('Настройки уровней сохранены для всех пользователей');
+    });
+}
+
+function setActiveTab(tab) { activeTab = tab; renderApp(); }
+
+function renderApp() {
+    if (!currentUser) return;
+    const isManager = currentUser.role === 'manager';
+    const activeEmployees = employees.filter(e => e.status !== 'archived');
+    const html = `
+        <div class="container">
+            <div class="card flex">
+                <h1 style="background: linear-gradient(135deg,#2d6a4f,#9b6bff); -webkit-background-clip: text; background-clip: text; color: transparent;">🏆 ОКОИНЫ</h1>
+                <div class="flex">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        ${currentUser.photo ? `<img src="${currentUser.photo}" class="avatar">` : `<div class="avatar">👤</div>`}
+                        <div><strong>${getFullName(currentUser)}</strong> ⭐ ${currentUser.rating}<br>${getLevelBadge(currentUser.rating)}</div>
+                    </div>
+                    <button class="btn btn-secondary" id="logoutBtn">Выйти</button>
+                    <button class="btn btn-secondary" id="changePwdBtn">🔑 Сменить пароль</button>
+                </div>
+            </div>
+            <div class="tab-buttons">
+                <button class="tab-btn ${activeTab === 'main' ? 'active' : ''}" data-tab="main">🏠 Главная</button>
+                ${isManager ? `<button class="tab-btn ${activeTab === 'dashboard' ? 'active' : ''}" data-tab="dashboard">📊 Дашборд</button>` : ''}
+                ${isManager ? `<button class="tab-btn ${activeTab === 'users' ? 'active' : ''}" data-tab="users">👥 Управление</button>` : ''}
+                ${isManager ? `<button class="tab-btn ${activeTab === 'prizes-admin' ? 'active' : ''}" data-tab="prizes-admin">🎁 Призы</button>` : ''}
+                ${isManager ? `<button class="tab-btn ${activeTab === 'level-settings' ? 'active' : ''}" data-tab="level-settings">⚙️ Уровни</button>` : ''}
+                ${!isManager ? `<button class="tab-btn ${activeTab === 'achievements' ? 'active' : ''}" data-tab="achievements">🌟 Достижения</button>` : ''}
+                ${!isManager ? `<button class="tab-btn ${activeTab === 'history' ? 'active' : ''}" data-tab="history">📜 История</button>` : ''}
+                <button class="tab-btn ${activeTab === 'profile' ? 'active' : ''}" data-tab="profile">👤 Профиль</button>
+            </div>
+            <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>👥 Команда</h3>
+                        ${activeEmployees.map(emp => `
+                            <div class="employee-card" onclick="${isManager ? `showEmployeeProfile(${emp.id})` : ''}">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    ${emp.photo ? `<img src="${emp.photo}" style="width:40px;height:40px;border-radius:50%;">` : '👤'}
+                                    <div><strong>${getFullName(emp)}</strong> ${getLevelBadge(emp.rating)}<br>💰 ${emp.points} ОКОИНОВ</div>
+                                </div>
+                                ${isManager ? `
+                                    <div onclick="event.stopPropagation()">
+                                        <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 5)">+5</button>
+                                        <button class="btn btn-secondary" onclick="updatePoints(${emp.id}, 10)">+10</button>
+                                        <button class="btn btn-warning" onclick="let a=prompt('Сумма списания:'); if(a) updatePoints(${emp.id}, -parseInt(a))">-</button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                        ${isManager ? `<div><button class="btn btn-primary" id="addUserBtn">➕ Добавить сотрудника</button></div>` : ''}
+                    </div>
+                    <div class="card">
+                        <h3>🎁 Призы</h3>
+                        ${prizes.map(p => `<div class="prize-card" onclick="showPrizeModal(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br>${p.description}</div><div>💰 ${p.cost} ОКОИНОВ</div></div>`).join('')}
+                        ${!isManager ? `<div style="margin-top:12px; background:#d1fae5; padding:8px; border-radius:20px;">🎯 Доступно: ${prizes.filter(p => p.cost <= currentUser.points).length} призов</div>` : ''}
+                    </div>
+                </div>
+            </div>
+            ${isManager ? `
+            <div id="tab-dashboard" class="tab ${activeTab === 'dashboard' ? 'active' : ''}"><div id="dashboardContent"></div></div>
+            <div id="tab-users" class="tab ${activeTab === 'users' ? 'active' : ''}">
+                <div class="card">
+                    <h3>📋 Управление сотрудниками</h3>
+                    ${employees.map(u => `
+                        <div class="employee-card" onclick="showEmployeeProfile(${u.id})">
+                            <div><strong>${getFullName(u)}</strong> (${u.login})<br>💰 ${u.points} ОКОИНОВ | ⭐ ${u.rating}<br>📧 ${u.email || '-'}</div>
+                            <div onclick="event.stopPropagation()" class="flex">
+                                <button class="btn btn-secondary" onclick="updateUserPoints(${u.id}, parseInt(prompt('Новый баланс:', ${u.points})))">Баланс</button>
+                                <button class="btn btn-secondary" onclick="updateUserEmail(${u.id}, prompt('Новый email:'))">Email</button>
+                                <button class="btn btn-warning" onclick="resetUserPassword(${u.id})">Сброс пароля</button>
+                                <button class="btn btn-danger" onclick="archiveUser(${u.id})">${u.status === 'archived' ? 'Восстановить' : 'Архив'}</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                    <div class="flex" style="margin-top:20px;"><button class="btn btn-primary" id="exportExcelBtn">📎 Экспорт в Excel</button></div>
+                </div>
+            </div>
+            <div id="tab-prizes-admin" class="tab ${activeTab === 'prizes-admin' ? 'active' : ''}">
+                <div class="card">
+                    <div class="flex"><h3>🎁 Управление призами</h3><button class="btn btn-primary" id="addPrizeBtn">➕ Добавить приз</button></div>
+                    ${prizes.map(p => `
+                        <div class="prize-card">
+                            <div><strong>${p.name}</strong><br>${p.description}<br>💰 ${p.cost} ОКОИНОВ</div>
+                            <div>
+                                <button class="btn btn-secondary" onclick="editPrizePrompt(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.cost}, '${(p.description || '').replace(/'/g, "\\'")}', '${(p.conditions || '').replace(/'/g, "\\'")}', '${(p.image_url || '').replace(/'/g, "\\'")}')">✏️</button>
+                                <button class="btn btn-danger" onclick="deletePrize(${p.id})">🗑️</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div id="tab-level-settings" class="tab ${activeTab === 'level-settings' ? 'active' : ''}"><div id="levelSettingsContent"></div></div>
+            ` : `
+            <div id="tab-achievements" class="tab ${activeTab === 'achievements' ? 'active' : ''}">
+                <div class="card">
+                    <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn btn-primary" id="addAchievementBtn">➕ Добавить</button></div>
+                    ${achievements.filter(a => a.user_id === currentUser.id).map(a => `
+                        <div class="achievement-item">
+                            <div><small>${new Date(a.date).toLocaleString()}</small><div>✨ ${a.text}</div></div>
+                            <div><button class="btn btn-secondary" onclick="editAchievement(${a.id}, prompt('Новый текст:', '${a.text.replace(/'/g, "\\'")}'))">✏️</button> <button class="btn btn-danger" onclick="deleteAchievement(${a.id})">🗑️</button></div>
+                        </div>
+                    `).join('') || '<p>Нет достижений</p>'}
+                </div>
+            </div>
+            <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
+                <div class="card">
+                    <h3>📜 История операций</h3>
+                    ${allHistory.filter(h => h.user_id === currentUser.id).slice(0,50).map(h => `
+                        <div style="padding:8px 0; border-bottom:1px solid #eee;">
+                            <small>${new Date(h.date).toLocaleString()}</small><br>
+                            ${h.reason}: <strong>${h.delta > 0 ? '+' : ''}${h.delta}</strong> → баланс: ${currentUser.points}
+                        </div>
+                    `).join('') || 'Нет операций'}
+                </div>
+            </div>
+            `}
+            <div id="tab-profile" class="tab ${activeTab === 'profile' ? 'active' : ''}">
+                <div class="card">
+                    <div class="flex">
+                        <div style="text-align:center;">
+                            ${currentUser.photo ? `<img src="${currentUser.photo}" style="width:100px;height:100px;border-radius:50%;">` : '<div style="width:100px;height:100px;background:#cbd5e1;border-radius:50%;display:flex;align-items:center;justify-content:center;">👤</div>'}
+                            <div><label class="btn btn-secondary" style="cursor:pointer;">📷 Загрузить фото<input type="file" id="profilePhotoInput" accept="image/*" style="display:none;"></label></div>
+                        </div>
+                        <div>
+                            <div><strong>ФИО:</strong> ${getFullName(currentUser)}</div>
+                            <div><strong>⭐ Рейтинг:</strong> ${currentUser.rating} ${getLevelBadge(currentUser.rating)}</div>
+                            <div><strong>💰 Баланс:</strong> ${currentUser.points} ОКОИНОВ</div>
+                            <div><strong>✉️ Email:</strong> ${currentUser.email || 'не указан'} <button class="btn btn-secondary" id="changeEmailBtn">Изменить</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="prizeModal" class="modal"><div class="modal-content" id="modalContent"></div></div>
+    `;
+    document.getElementById('app').innerHTML = html;
+    document.getElementById('logoutBtn')?.addEventListener('click', doLogout);
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.tab)));
+    document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
+        const old = prompt('Старый пароль:'); const newp = prompt('Новый пароль (мин 8, заглавная, цифра, спецсимвол):');
+        if (old && newp) await changePassword(old, newp);
+    });
+    if (!isManager) {
+        document.getElementById('addAchievementBtn')?.addEventListener('click', async () => {
+            const text = prompt('Текст достижения:'); if (text) await addAchievement(currentUser.id, text);
+        });
+        document.getElementById('changeEmailBtn')?.addEventListener('click', async () => {
+            const email = prompt('Новый email:', currentUser.email || ''); if (email !== null) await updateUserEmail(currentUser.id, email);
+        });
+        const photoInput = document.getElementById('profilePhotoInput');
+        if (photoInput) photoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) updateUserPhoto(currentUser.id, file);
+        });
+    }
+    if (isManager) {
+        document.getElementById('addUserBtn')?.addEventListener('click', () => {
+            const name = prompt('Имя'); const surname = prompt('Фамилия'); const login = prompt('Логин');
+            const password = prompt('Пароль'); const points = parseInt(prompt('Начальные баллы', 0));
+            if (name && surname && login && password) addUser(name, surname, login, password, points);
+        });
+        document.getElementById('addPrizeBtn')?.addEventListener('click', () => {
+            const name = prompt('Название приза');
+            const cost = prompt('Стоимость в ОКОИНАХ');
+            const desc = prompt('Описание (можно с переносами)');
+            const conditions = prompt('Условия (можно с переносами)');
+            const img = prompt('URL фото (необязательно)');
+            if (name && cost) addPrize(name, cost, desc || '', conditions || '', img || '');
+        });
+        document.querySelectorAll('#exportExcelBtn').forEach(btn => btn?.addEventListener('click', exportToExcel));
+        if (activeTab === 'dashboard') renderDashboard();
+        if (activeTab === 'level-settings') renderLevelSettings();
+    }
+    window.editPrizePrompt = (id, name, cost, desc, conditions, img) => {
+        const newName = prompt('Название', name);
+        const newCost = prompt('Стоимость', cost);
+        const newDesc = prompt('Описание (можно с переносами)', desc);
+        const newConditions = prompt('Условия (можно с переносами)', conditions);
+        const newImg = prompt('URL фото', img);
+        if (newName && newCost) editPrize(id, newName, newCost, newDesc, newConditions, newImg);
+    };
+}
+
+// ========== ЗАПУСК ==========
+loadAllData();
+
+window.updatePoints = updatePoints;
+window.archiveUser = archiveUser;
+window.updateUserEmail = updateUserEmail;
+window.updateUserPoints = updateUserPoints;
+window.addPrize = addPrize;
+window.editPrize = editPrize;
+window.deletePrize = deletePrize;
+window.showPrizeModal = showPrizeModal;
+window.addAchievement = addAchievement;
+window.deleteAchievement = deleteAchievement;
+window.editAchievement = editAchievement;
+window.resetUserPassword = resetUserPassword;
+window.showEmployeeProfile = showEmployeeProfile;
+window.editPrizePrompt = editPrizePrompt;
+window.exportToExcel = exportToExcel;
+window.updateUserPhoto = updateUserPhoto;
+window.changePassword = changePassword;
+</script>
+</body>
+</html>
