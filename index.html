@@ -65,14 +65,6 @@ let achievements = [];
 let levelConfig = null;
 let isLoading = false;
 
-// Восстановление сессии
-const savedUser = localStorage.getItem('oko_current_user');
-if (savedUser) {
-    try {
-        currentUser = JSON.parse(savedUser);
-    } catch(e) {}
-}
-
 // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 function showToast(msg, isError = false) {
     const toast = document.createElement('div');
@@ -126,7 +118,6 @@ async function loadLevels() {
         levelConfig = data[0].value;
         localStorage.setItem('oko_levels_backup', JSON.stringify(levelConfig));
     } else {
-        // fallback
         levelConfig = JSON.parse(localStorage.getItem('oko_levels_backup')) || {
             bronze: { name: 'Бронза', emoji: '🥉', min: 0, max: 99, color: 'bronze' },
             silver: { name: 'Серебро', emoji: '🥈', min: 100, max: 299, color: 'silver' },
@@ -143,7 +134,6 @@ async function saveLevelsToDB(levels) {
         body: JSON.stringify({ value: levels })
     });
     if (result === null) {
-        // пробуем вставить
         await apiFetch(`${SUPABASE_URL}/rest/v1/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -781,7 +771,17 @@ window.editPrizePrompt = editPrizePrompt;
 window.exportToExcel = exportToExcel;
 window.updateUserPhoto = updateUserPhoto;
 
+// Восстанавливаем сессию
+const savedUser = localStorage.getItem('oko_current_user');
+if (savedUser) {
+    try {
+        currentUser = JSON.parse(savedUser);
+    } catch(e) {}
+}
+// Запускаем отрисовку (если есть сохранённый пользователь, он загрузится и покажет интерфейс)
 renderApp();
+// Если есть сохранённый пользователь, загружаем данные в фоне
+if (currentUser) loadDataInBackground();
 </script>
 </body>
 </html>
