@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ОКОИНЫ</title>
+    <title>ОКОИНЫ — мотивация сотрудников</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -78,34 +78,48 @@ function getLevel(rating) {
 }
 
 async function api(url, options = {}) {
-    const res = await fetch(url, {
-        ...options,
-        headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-            ...options.headers
+    try {
+        const res = await fetch(url, {
+            ...options,
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+        if (!res.ok) {
+            console.error('API Error:', res.status);
+            return null;
         }
-    });
-    return await res.json();
+        return await res.json();
+    } catch(e) {
+        console.error('Fetch Error:', e);
+        return null;
+    }
 }
 
 // ========== ЗАГРУЗКА ДАННЫХ ==========
 async function loadEmployees() {
     const data = await api(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
     if (data) employees = data;
+    return data;
 }
 async function loadPrizes() {
     const data = await api(`${SUPABASE_URL}/rest/v1/prizes`);
     if (data) prizes = data;
+    return data;
 }
 async function loadAchievements() {
     const data = await api(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
     if (data) achievements = data;
+    return data;
 }
 async function loadHistory() {
     const data = await api(`${SUPABASE_URL}/rest/v1/history?order=date.desc`);
     if (data) history = data;
+    console.log('Загружено записей истории:', data?.length || 0);
+    return data;
 }
 async function loadAllData() {
     await Promise.all([loadEmployees(), loadPrizes(), loadAchievements(), loadHistory()]);
@@ -125,8 +139,8 @@ async function login() {
         if (data && data.length > 0) {
             currentUser = data[0];
             localStorage.setItem('user', JSON.stringify(currentUser));
+            await loadAllData();
             renderMain();
-            loadAllData();
         } else {
             errDiv.innerText = 'Неверный логин или пароль';
         }
@@ -134,29 +148,61 @@ async function login() {
 }
 function logout() { currentUser = null; localStorage.removeItem('user'); renderLogin(); }
 
-// ========== БАЛЛЫ ==========
+// ========== БАЛЛЫ (ИСПРАВЛЕНО) ==========
 async function addPoints(empId, delta) {
     const emp = employees.find(e => e.id === empId);
-    if (!emp) return;
+    if (!emp) {
+        alert('Сотрудник не найден');
+        return;
+    }
+    
     const reason = prompt('Причина:', delta > 0 ? 'Бонус' : 'Замечание');
     if (!reason) return;
     
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
     
-    // Обновляем пользователя
-    await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+    // 1. Обновляем пользователя
+    const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
-    // Добавляем запись в историю
-    await api(`${SUPABASE_URL}/rest/v1/history`, {
+    if (!updateResponse.ok) {
+        alert('Ошибка обновления баланса');
+        return;
+    }
+    
+    // 2. Добавляем запись в историю
+    const historyResponse = await fetch(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
-        body: JSON.stringify({ user_id: empId, reason, delta })
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            user_id: empId, 
+            reason: reason, 
+            delta: delta 
+        })
     });
     
-    // Обновляем локальные данные
+    if (!historyResponse.ok) {
+        const errorText = await historyResponse.text();
+        console.error('Ошибка истории:', errorText);
+        alert('Ошибка сохранения истории: ' + historyResponse.status);
+        return;
+    }
+    
+    console.log('✅ История сохранена, статус:', historyResponse.status);
+    
+    // 3. Обновляем локальные данные
     emp.points = newPoints;
     emp.rating = newRating;
     if (currentUser.id === empId) { 
@@ -164,7 +210,10 @@ async function addPoints(empId, delta) {
         currentUser.rating = newRating; 
     }
     
+    // 4. Принудительно перезагружаем историю
     await loadHistory();
+    
+    // 5. Обновляем интерфейс
     renderMain();
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
 }
@@ -177,13 +226,20 @@ async function addEmployee() {
     const password = prompt('Пароль');
     const points = parseInt(prompt('Начальные баллы', 0));
     if (!name || !surname || !login || !password) return;
-    await api(`${SUPABASE_URL}/rest/v1/users`, {
+    
+    const result = await api(`${SUPABASE_URL}/rest/v1/users`, {
         method: 'POST',
         body: JSON.stringify({
             name, surname, login, password, role: 'employee',
             points, rating: points, status: 'active'
         })
     });
+    
+    if (result === null) {
+        alert('Ошибка добавления сотрудника');
+        return;
+    }
+    
     await loadEmployees();
     renderMain();
     alert('Сотрудник добавлен');
@@ -211,7 +267,6 @@ async function resetUserPassword(userId) {
         method: 'PATCH',
         body: JSON.stringify({ password: newPassword })
     });
-    await loadEmployees();
     alert(`Пароль сброшен на: ${newPassword}`);
 }
 
@@ -294,7 +349,7 @@ function refreshAchievementsList() {
     `).join('');
 }
 
-// ========== ПРИЗЫ (С ИСПРАВЛЕННЫМ РЕДАКТИРОВАНИЕМ) ==========
+// ========== ПРИЗЫ ==========
 async function addPrize() {
     const name = prompt('Название приза');
     const cost = parseInt(prompt('Стоимость в ОКОИНАХ'));
@@ -321,16 +376,10 @@ async function editPrize(id) {
     const desc = prompt('Описание', prize.description || '');
     const conditions = prompt('Условия получения', prize.conditions || '');
     
-    console.log('Отправка обновления:', { name, cost, desc, conditions });
-    
-    const result = await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, {
+    await api(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    
-    console.log('Результат обновления:', result);
-    
-    // Принудительно перезагружаем призы
     await loadPrizes();
     renderMain();
     alert('Приз обновлён');
@@ -377,7 +426,6 @@ function exportToExcel() {
     alert('Экспорт сотрудников завершён');
 }
 
-// НОВАЯ ФУНКЦИЯ: Экспорт достижений в Excel
 function exportAchievementsToExcel() {
     const data = [['Дата', 'Сотрудник', 'Достижение']];
     achievements.forEach(a => {
@@ -391,7 +439,6 @@ function exportAchievementsToExcel() {
     alert('Экспорт достижений завершён');
 }
 
-// НОВАЯ ФУНКЦИЯ: Экспорт истории операций в Excel
 function exportHistoryToExcel() {
     const data = [['Дата', 'Сотрудник', 'Причина', 'Изменение', 'Тип']];
     history.forEach(h => {
@@ -488,7 +535,6 @@ function renderMain() {
     const availablePrizes = prizes.filter(p => p.cost <= currentUser.points);
     const unavailablePrizes = prizes.filter(p => p.cost > currentUser.points);
     
-    // Для менеджера: все операции по всем сотрудникам
     const allHistory = isManager ? history : [];
     const allAchievements = isManager ? achievements : [];
     
@@ -505,22 +551,12 @@ function renderMain() {
                 </div>
             </div>
             
-            <!-- Статистика для сотрудника -->
             ${!isManager ? `
             <div class="card">
                 <div class="stats-row">
-                    <div class="stat-item">
-                        <div class="stat-label">🏆 Всего заработано</div>
-                        <div class="stat-value">${totalEarned} ОКОИНОВ</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">💰 Текущий баланс</div>
-                        <div class="stat-value">${currentUser.points} ОКОИНОВ</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-label">⭐ Рейтинг</div>
-                        <div class="stat-value">${currentUser.rating}</div>
-                    </div>
+                    <div class="stat-item"><div class="stat-label">🏆 Всего заработано</div><div class="stat-value">${totalEarned} ОКОИНОВ</div></div>
+                    <div class="stat-item"><div class="stat-label">💰 Текущий баланс</div><div class="stat-value">${currentUser.points} ОКОИНОВ</div></div>
+                    <div class="stat-item"><div class="stat-label">⭐ Рейтинг</div><div class="stat-value">${currentUser.rating}</div></div>
                 </div>
             </div>
             ` : ''}
@@ -539,15 +575,12 @@ function renderMain() {
             <!-- Команда -->
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="card">
-                    <h3>👥 Команда <span style="font-size:12px;">(нажмите для просмотра деталей)</span></h3>
-                    ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
+                    <h3>👥 Команда</h3>
                     ${!isLoading && activeEmployees.map(emp => {
                         const empLevel = getLevel(emp.rating);
                         return `
                         <div class="employee" onclick="showEmployeeProfile(${emp.id})">
-                            <div class="flex" style="gap:10px;">
-                                <div><strong>${emp.name} ${emp.surname || ''}</strong> <span class="level-badge ${empLevel.class}">${empLevel.emoji} ${empLevel.name}</span><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
-                            </div>
+                            <div><strong>${emp.name} ${emp.surname || ''}</strong> <span class="level-badge ${empLevel.class}">${empLevel.emoji} ${empLevel.name}</span><br>⭐ ${emp.rating} | 💰 ${emp.points} ОКОИНОВ</div>
                             ${isManager ? `
                                 <div onclick="event.stopPropagation()">
                                     <button class="btn btn-secondary btn-small" onclick="addPoints(${emp.id}, 5)">+5</button>
@@ -558,7 +591,7 @@ function renderMain() {
                             ` : ''}
                         </div>
                     `}).join('')}
-                    ${!isLoading && isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
+                    ${isManager ? `<button class="btn" style="margin-top:15px;" onclick="addEmployee()">➕ Добавить сотрудника</button>` : ''}
                 </div>
             </div>
             
@@ -567,36 +600,22 @@ function renderMain() {
                 <div class="card">
                     <h3>🎁 Призы</h3>
                     ${!isManager ? `
-                        <div class="prizes-section">
-                            <h4>✅ Доступные призы (${availablePrizes.length})</h4>
-                            ${availablePrizes.length === 0 ? '<p style="color:#888; margin:10px 0;">Нет доступных призов. Зарабатывайте больше ОКОИНОВ!</p>' : ''}
-                            ${availablePrizes.map(p => `
-                                <div class="prize-item available-prize" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                                    <div><strong>${p.name}</strong> <span class="badge-available">✓ Доступен</span><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div>
-                                    <div>💰 ${p.cost} ОКОИНОВ</div>
-                                </div>
-                            `).join('')}
+                        <div class="prizes-section"><h4>✅ Доступные призы (${availablePrizes.length})</h4>
+                        ${availablePrizes.map(p => `<div class="prize-item available-prize" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong> <span class="badge-available">✓ Доступен</span><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div><div>💰 ${p.cost} ОКОИНОВ</div></div>`).join('')}
                         </div>
-                        <div class="prizes-section">
-                            <h4>🔒 Недоступные призы (${unavailablePrizes.length})</h4>
-                            ${unavailablePrizes.map(p => `
-                                <div class="prize-item" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                                    <div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div>
-                                    <div>💰 ${p.cost} ОКОИНО <span style="color:#dc2626; font-size:11px;">(не хватает ${p.cost - currentUser.points})</span></div>
-                                </div>
-                            `).join('')}
+                        <div class="prizes-section"><h4>🔒 Недоступные призы (${unavailablePrizes.length})</h4>
+                        ${unavailablePrizes.map(p => `<div class="prize-item" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div><div>💰 ${p.cost} ОКОИНО <span style="color:#dc2626;">(не хватает ${p.cost - currentUser.points})</span></div></div>`).join('')}
                         </div>
                     ` : `
                         ${prizes.map(p => `
                             <div class="prize-item">
-                                <div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span><br>💰 ${p.cost} ОКОИНОВ</div>
+                                <div><strong>${p.name}</strong><br>💰 ${p.cost} ОКОИНОВ</div>
                                 <div>
                                     <button class="btn btn-secondary btn-small" onclick="editPrize(${p.id})">✏️</button>
                                     <button class="btn btn-danger btn-small" onclick="deletePrize(${p.id})">🗑️</button>
                                 </div>
                             </div>
                         `).join('')}
-                        ${prizes.length === 0 ? '<p>Нет призов</p>' : ''}
                     `}
                 </div>
             </div>
@@ -606,17 +625,17 @@ function renderMain() {
                 <div class="card">
                     <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn" onclick="addAchievement()">➕ Добавить</button></div>
                     <div id="achievementsListContainer">
-                        ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
-                        ${!isLoading && myAchievements.length === 0 ? '<p class="loading">Нет достижений. Добавьте первое!</p>' : ''}
-                        ${!isLoading && myAchievements.map(a => `
-                            <div class="achievement-item">
-                                <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
-                                <div>
-                                    <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
-                                    <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
+                        ${isLoading ? '<div class="loading">Загрузка...</div>' : myAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : 
+                            myAchievements.map(a => `
+                                <div class="achievement-item">
+                                    <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
+                                    <div>
+                                        <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
+                                        <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
+                                    </div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            `).join('')
+                        }
                     </div>
                 </div>
             </div>
@@ -625,24 +644,15 @@ function renderMain() {
             <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
                 <div class="card">
                     <h3>📜 Моя история операций</h3>
-                    ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
-                    ${!isLoading && myHistory.map(h => `
-                        <div class="history-item">
-                            <div>
-                                <span class="history-date">${new Date(h.date).toLocaleString()}</span><br>
-                                ${h.reason}: <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ
-                            </div>
-                        </div>
-                    `).join('')}
-                    ${!isLoading && myHistory.length === 0 ? '<p class="loading">Нет операций</p>' : ''}
+                    ${myHistory.map(h => `
+                        <div class="history-item"><div><span class="history-date">${new Date(h.date).toLocaleString()}</span><br>${h.reason}: <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ</div></div>
+                    `).join('') || '<p class="loading">Нет операций</p>'}
                 </div>
             </div>
             
             ${isManager ? `
-            <!-- Дашборд -->
             <div id="tab-dashboard" class="tab ${activeTab === 'dashboard' ? 'active' : ''}"><div id="dashboardContent"></div></div>
             
-            <!-- Управление -->
             <div id="tab-manage" class="tab ${activeTab === 'manage' ? 'active' : ''}">
                 <div class="card">
                     <div class="flex"><h3>🎁 Управление призами</h3><button class="btn" onclick="addPrize()">➕ Добавить приз</button></div>
@@ -651,18 +661,17 @@ function renderMain() {
                             <div><strong>${p.name}</strong><br>💰 ${p.cost} ОКОИНОВ</div>
                             <div>
                                 <button class="btn btn-secondary btn-small" onclick="editPrize(${p.id})">✏️</button>
-                                <button class="btn btn-danger btn-small" onclick="deletePrize(${p.id})">🗑️ Удалить</button>
+                                <button class="btn btn-danger btn-small" onclick="deletePrize(${p.id})">🗑️</button>
                             </div>
                         </div>
                     `).join('')}
-                    ${prizes.length === 0 ? '<p>Нет призов</p>' : ''}
                     <hr style="margin: 20px 0;">
                     <h3>👥 Управление сотрудниками</h3>
                     ${employees.map(emp => `
                         <div class="employee">
                             <div><strong>${emp.name} ${emp.surname || ''}</strong><br>🔑 ${emp.login}<br>💰 ${emp.points} ОКОИНОВ</div>
                             <div>
-                                <button class="btn btn-secondary btn-small" onclick="editEmployee(${emp.id}, '${emp.name.replace(/'/g, "\\'")}', '${(emp.surname || '').replace(/'/g, "\\'")}', '${emp.login.replace(/'/g, "\\'")}')">✏️ Редактировать</button>
+                                <button class="btn btn-secondary btn-small" onclick="editEmployee(${emp.id}, '${emp.name.replace(/'/g, "\\'")}', '${(emp.surname || '').replace(/'/g, "\\'")}', '${emp.login.replace(/'/g, "\\'")}')">✏️</button>
                                 <button class="btn btn-secondary btn-small" onclick="updateUserPoints(${emp.id}, parseInt(prompt('Новый баланс:', ${emp.points})))">💰 Баланс</button>
                                 <button class="btn btn-warning btn-small" onclick="resetUserPassword(${emp.id})">🔄 Сброс пароля</button>
                             </div>
@@ -677,38 +686,21 @@ function renderMain() {
                 </div>
             </div>
             
-            <!-- Все операции по всем сотрудникам -->
             <div id="tab-allhistory" class="tab ${activeTab === 'allhistory' ? 'active' : ''}">
-                <div class="card">
-                    <h3>📋 Все операции начислений и списаний</h3>
-                    ${allHistory.map(h => {
-                        const emp = employees.find(e => e.id === h.user_id);
-                        return `
-                            <div class="log-row">
-                                <span class="history-date">${new Date(h.date).toLocaleString()}</span><br>
-                                <span class="log-employee">${emp ? emp.name : 'Неизвестный'}</span>: ${h.reason} — 
-                                <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ
-                            </div>
-                        `;
-                    }).join('')}
-                    ${allHistory.length === 0 ? '<p class="loading">Нет операций</p>' : ''}
+                <div class="card"><h3>📋 Все операции</h3>
+                ${allHistory.map(h => {
+                    const emp = employees.find(e => e.id === h.user_id);
+                    return `<div class="log-row"><span class="history-date">${new Date(h.date).toLocaleString()}</span><br><span class="log-employee">${emp ? emp.name : 'Неизвестный'}</span>: ${h.reason} — <span class="${h.delta > 0 ? 'history-delta-plus' : 'history-delta-minus'}">${h.delta > 0 ? '+' : ''}${h.delta}</span> ОКОИНОВ</div>`;
+                }).join('') || '<p class="loading">Нет операций</p>'}
                 </div>
             </div>
             
-            <!-- Все достижения по всем сотрудникам -->
             <div id="tab-allachievements" class="tab ${activeTab === 'allachievements' ? 'active' : ''}">
-                <div class="card">
-                    <div class="flex"><h3>🏅 Все достижения сотрудников</h3><button class="btn btn-secondary btn-small" onclick="exportAchievementsToExcel()">📊 Экспорт в Excel</button></div>
-                    ${allAchievements.map(a => {
-                        const emp = employees.find(e => e.id === a.user_id);
-                        return `
-                            <div class="log-row">
-                                <span class="history-date">${new Date(a.date).toLocaleString()}</span><br>
-                                <span class="log-employee">${emp ? emp.name : 'Неизвестный'}</span>: ✨ ${a.text}
-                            </div>
-                        `;
-                    }).join('')}
-                    ${allAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : ''}
+                <div class="card"><div class="flex"><h3>🏅 Все достижения</h3><button class="btn btn-secondary btn-small" onclick="exportAchievementsToExcel()">📊 Экспорт</button></div>
+                ${allAchievements.map(a => {
+                    const emp = employees.find(e => e.id === a.user_id);
+                    return `<div class="log-row"><span class="history-date">${new Date(a.date).toLocaleString()}</span><br><span class="log-employee">${emp ? emp.name : 'Неизвестный'}</span>: ✨ ${a.text}</div>`;
+                }).join('') || '<p class="loading">Нет достижений</p>'}
                 </div>
             </div>
             ` : ''}
@@ -727,7 +719,6 @@ function renderMain() {
     }
 }
 
-// Дополнительные функции для менеджера
 async function updateUserPoints(id, newPoints) {
     if (isNaN(newPoints)) return;
     await api(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
