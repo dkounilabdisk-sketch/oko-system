@@ -79,6 +79,16 @@ function getLevel(rating) {
     return { name: 'Бронза', emoji: '🥉', class: 'level-bronze' };
 }
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
+
 async function api(url, options = {}) {
     try {
         const res = await fetch(url, {
@@ -115,6 +125,7 @@ async function loadPrizes() {
 async function loadAchievements() {
     const data = await api(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
     if (data) achievements = data;
+    console.log('🏅 Загружено достижений:', data?.length || 0);
     return data;
 }
 async function loadHistory() {
@@ -269,29 +280,35 @@ function showEmployeeProfile(empId) {
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 }
 
-// ========== ДОСТИЖЕНИЯ (С МГНОВЕННЫМ ОБНОВЛЕНИЕМ) ==========
+// ========== ДОСТИЖЕНИЯ (ИСПРАВЛЕНЫ) ==========
 async function addAchievement() {
     const text = prompt('Текст достижения:');
     if (!text) return;
     
-    const result = await api(`${SUPABASE_URL}/rest/v1/achievements`, {
+    console.log('🆕 Добавляем достижение:', text);
+    
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements`, {
         method: 'POST',
-        body: JSON.stringify({ user_id: currentUser.id, text })
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ user_id: currentUser.id, text: text })
     });
     
-    if (result) {
-        // Добавляем новое достижение в локальный массив
-        const newAchievement = { 
-            id: Date.now(), 
-            user_id: currentUser.id, 
-            text: text, 
-            date: new Date().toISOString() 
-        };
-        achievements.unshift(newAchievement);
+    console.log('📡 Статус добавления:', response.status);
+    
+    if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Достижение добавлено:', result);
+        await loadAchievements();
         refreshAchievementsList();
-        alert('Достижение добавлено');
+        alert('✅ Достижение добавлено');
     } else {
-        alert('Ошибка добавления');
+        const error = await response.text();
+        console.error('❌ Ошибка добавления:', error);
+        alert('❌ Ошибка добавления достижения');
     }
 }
 
@@ -299,36 +316,54 @@ async function editAchievement(id, oldText) {
     const newText = prompt('Редактировать достижение:', oldText);
     if (!newText || newText === oldText) return;
     
-    const result = await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
+    console.log('✏️ Редактируем достижение ID:', id, 'Текст:', newText);
+    
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
         method: 'PATCH',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ text: newText })
     });
     
-    if (result) {
-        // Обновляем в локальном массиве
-        const index = achievements.findIndex(a => a.id === id);
-        if (index !== -1) {
-            achievements[index].text = newText;
-            refreshAchievementsList();
-        }
-        alert('Достижение обновлено');
+    console.log('📡 Статус редактирования:', response.status);
+    
+    if (response.ok) {
+        await loadAchievements();
+        refreshAchievementsList();
+        alert('✅ Достижение обновлено');
     } else {
-        alert('Ошибка обновления');
+        const error = await response.text();
+        console.error('❌ Ошибка редактирования:', error);
+        alert('❌ Ошибка редактирования достижения');
     }
 }
 
 async function deleteAchievement(id) {
     if (!confirm('Удалить достижение?')) return;
     
-    const result = await api(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { method: 'DELETE' });
+    console.log('🗑️ Удаляем достижение с ID:', id);
     
-    if (result !== null) {
-        // Удаляем из локального массива
-        achievements = achievements.filter(a => a.id !== id);
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { 
+        method: 'DELETE',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        }
+    });
+    
+    console.log('📡 Статус удаления:', response.status);
+    
+    if (response.ok || response.status === 204) {
+        await loadAchievements();
         refreshAchievementsList();
-        alert('Достижение удалено');
+        alert('✅ Достижение удалено');
     } else {
-        alert('Ошибка удаления');
+        const error = await response.text();
+        console.error('❌ Ошибка удаления:', error);
+        alert('❌ Ошибка удаления достижения');
     }
 }
 
@@ -342,9 +377,9 @@ function refreshAchievementsList() {
     }
     container.innerHTML = myAchievements.map(a => `
         <div class="achievement-item">
-            <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
+            <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${escapeHtml(a.text)}</div>
             <div>
-                <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
+                <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${escapeHtml(a.text).replace(/'/g, "\\'")}')">✏️</button>
                 <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
             </div>
         </div>
@@ -638,9 +673,9 @@ function renderMain() {
                             myAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : 
                             myAchievements.map(a => `
                                 <div class="achievement-item">
-                                    <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${a.text}</div>
+                                    <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${escapeHtml(a.text)}</div>
                                     <div>
-                                        <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${a.text.replace(/'/g, "\\'")}')">✏️</button>
+                                        <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${escapeHtml(a.text).replace(/'/g, "\\'")}')">✏️</button>
                                         <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
                                     </div>
                                 </div>
