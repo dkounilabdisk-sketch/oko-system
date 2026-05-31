@@ -27,8 +27,6 @@
         .tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; border-radius: 60px; font-size: 14px; }
         .tab-btn.active { background: #2d6a4f; color: white; }
         .loading { text-align: center; padding: 20px; color: #666; }
-        .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #2d6a4f; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle; }
-        @keyframes spin { to { transform: rotate(360deg); } }
         .history-date { font-size: 11px; color: #666; }
         .history-delta-plus { color: #2d6a4f; font-weight: 600; }
         .history-delta-minus { color: #dc2626; font-weight: 600; }
@@ -70,16 +68,8 @@ let achievements = [];
 let history = [];
 let activeTab = 'main';
 let dashboardChart = null;
+let dataLoaded = false;
 
-// Состояние загрузки
-let loadingStates = {
-    employees: true,
-    prizes: true,
-    achievements: true,
-    history: true
-};
-
-// ========== НОВЫЕ ПОРОГИ УРОВНЕЙ ==========
 function getLevel(rating) {
     if (rating >= 80) return { name: 'Платина', emoji: '💎', class: 'level-platinum' };
     if (rating >= 50) return { name: 'Золото', emoji: '🥇', class: 'level-gold' };
@@ -116,42 +106,38 @@ async function apiFetch(url, options = {}) {
     }
 }
 
-// ========== ЗАГРУЗКА ДАННЫХ ==========
-async function loadEmployees() {
-    loadingStates.employees = true;
-    renderMain();
-    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`);
-    if (data) employees = data;
-    loadingStates.employees = false;
-    renderMain();
-}
-async function loadPrizes() {
-    loadingStates.prizes = true;
-    renderMain();
-    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/prizes`);
-    if (data) prizes = data;
-    loadingStates.prizes = false;
-    renderMain();
-}
-async function loadAchievements() {
-    loadingStates.achievements = true;
-    renderMain();
-    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
-    if (data) achievements = data;
-    loadingStates.achievements = false;
-    renderMain();
-}
-async function loadHistory() {
-    loadingStates.history = true;
-    renderMain();
-    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/history?order=date.desc`);
-    if (data) history = data;
-    loadingStates.history = false;
+// ========== ОБНОВЛЕНИЕ ВСЕХ ДАННЫХ ==========
+async function refreshAllData() {
+    if (!currentUser) return;
+    
+    const [empData, prizeData, histData, achData] = await Promise.all([
+        apiFetch(`${SUPABASE_URL}/rest/v1/users?role=eq.employee`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/prizes`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/history?order=date.desc`),
+        apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`)
+    ]);
+    
+    if (empData) employees = empData;
+    if (prizeData) prizes = prizeData;
+    if (histData) history = histData;
+    if (achData) achievements = achData;
+    
+    // Обновляем текущего пользователя в локальных данных
+    if (currentUser) {
+        const updatedUser = employees.find(e => e.id === currentUser.id);
+        if (updatedUser) {
+            currentUser = updatedUser;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+        }
+    }
+    
+    dataLoaded = true;
     renderMain();
 }
 
+// ========== ЗАГРУЗКА ДАННЫХ ПРИ ВХОДЕ ==========
 async function loadAllData() {
-    Promise.all([loadEmployees(), loadPrizes(), loadAchievements(), loadHistory()]);
+    await refreshAllData();
 }
 
 // ========== АУТЕНТИФИКАЦИЯ ==========
@@ -160,23 +146,34 @@ async function login() {
     const pass = document.getElementById('pass').value;
     const errDiv = document.getElementById('errorMsg');
     if (!login || !pass) { errDiv.innerText = 'Введите логин и пароль'; return; }
-    errDiv.innerText = 'Проверка...';
-    try {
-        const data = await apiFetch(`${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(pass)}`);
-        if (data && data.length > 0) {
-            currentUser = data[0];
-            localStorage.setItem('user', JSON.stringify(currentUser));
-            loadingStates = { employees: true, prizes: true, achievements: true, history: true };
-            renderMain();
-            loadAllData();
-        } else {
-            errDiv.innerText = 'Неверный логин или пароль';
+    
+    errDiv.innerText = 'Вход...';
+    
+    const data = await apiFetch(`${SUPABASE_URL}/rest/v1/users?login=eq.${encodeURIComponent(login)}&password=eq.${encodeURIComponent(pass)}`);
+    
+    if (data && data.length > 0) {
+        currentUser = data[0];
+        if (currentUser.status === 'archived') {
+            errDiv.innerText = 'Аккаунт архивирован';
+            return;
         }
-    } catch(e) { errDiv.innerText = 'Ошибка соединения'; }
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        dataLoaded = false;
+        renderMain();
+        await loadAllData();
+    } else {
+        errDiv.innerText = 'Неверный логин или пароль';
+    }
 }
-function logout() { currentUser = null; localStorage.removeItem('user'); renderLogin(); }
 
-// ========== БАЛЛЫ ==========
+function logout() { 
+    currentUser = null; 
+    localStorage.removeItem('user'); 
+    dataLoaded = false;
+    renderLogin(); 
+}
+
+// ========== БАЛЛЫ (ИСПРАВЛЕНО) ==========
 async function addPoints(empId, delta) {
     const emp = employees.find(e => e.id === empId);
     if (!emp) { alert('Сотрудник не найден'); return; }
@@ -187,7 +184,8 @@ async function addPoints(empId, delta) {
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
     
-    await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
+    // 1. Обновляем пользователя в базе
+    const updateResponse = await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -197,6 +195,12 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
+    if (!updateResponse.ok) {
+        alert('Ошибка обновления баланса');
+        return;
+    }
+    
+    // 2. Добавляем запись в историю
     await fetch(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         headers: {
@@ -207,16 +211,22 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ user_id: empId, reason, delta })
     });
     
+    // 3. Обновляем локальные данные
     emp.points = newPoints;
     emp.rating = newRating;
+    
+    // 4. Обновляем currentUser, если начисление себе
     if (currentUser.id === empId) { 
         currentUser.points = newPoints; 
         currentUser.rating = newRating; 
+        localStorage.setItem('user', JSON.stringify(currentUser));
     }
     
-    loadingStates.history = true;
+    // 5. Перезагружаем историю
+    const newHistory = await apiFetch(`${SUPABASE_URL}/rest/v1/history?order=date.desc`);
+    if (newHistory) history = newHistory;
+    
     renderMain();
-    await loadHistory();
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
 }
 
@@ -236,9 +246,8 @@ async function addEmployee() {
             points, rating: points, status: 'active'
         })
     });
-    loadingStates.employees = true;
-    renderMain();
-    await loadEmployees();
+    
+    await refreshAllData();
     alert('Сотрудник добавлен');
 }
 
@@ -253,9 +262,8 @@ async function editEmployee(empId, oldName, oldSurname, oldLogin) {
         method: 'PATCH',
         body: JSON.stringify({ name: newName, surname: newSurname, login: newLogin })
     });
-    loadingStates.employees = true;
-    renderMain();
-    await loadEmployees();
+    
+    await refreshAllData();
     alert('Данные сотрудника обновлены');
 }
 
@@ -300,7 +308,7 @@ async function addAchievement() {
     const text = prompt('Текст достижения:');
     if (!text) return;
     
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/achievements`, {
         method: 'POST',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -310,21 +318,15 @@ async function addAchievement() {
         body: JSON.stringify({ user_id: currentUser.id, text: text })
     });
     
-    if (response.ok) {
-        loadingStates.achievements = true;
-        renderMain();
-        await loadAchievements();
-        alert('✅ Достижение добавлено');
-    } else {
-        alert('❌ Ошибка добавления достижения');
-    }
+    await refreshAllData();
+    alert('✅ Достижение добавлено');
 }
 
 async function editAchievement(id, oldText) {
     const newText = prompt('Редактировать достижение:', oldText);
     if (!newText || newText === oldText) return;
     
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
         method: 'PATCH',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -334,20 +336,14 @@ async function editAchievement(id, oldText) {
         body: JSON.stringify({ text: newText })
     });
     
-    if (response.ok) {
-        loadingStates.achievements = true;
-        renderMain();
-        await loadAchievements();
-        alert('✅ Достижение обновлено');
-    } else {
-        alert('❌ Ошибка редактирования достижения');
-    }
+    await refreshAllData();
+    alert('✅ Достижение обновлено');
 }
 
 async function deleteAchievement(id) {
     if (!confirm('Удалить достижение?')) return;
     
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { 
+    await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { 
         method: 'DELETE',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -355,14 +351,8 @@ async function deleteAchievement(id) {
         }
     });
     
-    if (response.ok || response.status === 204) {
-        loadingStates.achievements = true;
-        renderMain();
-        await loadAchievements();
-        alert('✅ Достижение удалено');
-    } else {
-        alert('❌ Ошибка удаления достижения');
-    }
+    await refreshAllData();
+    alert('✅ Достижение удалено');
 }
 
 // ========== ПРИЗЫ ==========
@@ -376,9 +366,7 @@ async function addPrize() {
         method: 'POST',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    loadingStates.prizes = true;
-    renderMain();
-    await loadPrizes();
+    await refreshAllData();
     alert(`Приз "${name}" добавлен`);
 }
 
@@ -397,18 +385,14 @@ async function editPrize(id) {
         method: 'PATCH',
         body: JSON.stringify({ name, cost, description: desc, conditions })
     });
-    loadingStates.prizes = true;
-    renderMain();
-    await loadPrizes();
+    await refreshAllData();
     alert('Приз обновлён');
 }
 
 async function deletePrize(id) {
     if (!confirm('Удалить приз?')) return;
     await apiFetch(`${SUPABASE_URL}/rest/v1/prizes?id=eq.${id}`, { method: 'DELETE' });
-    loadingStates.prizes = true;
-    renderMain();
-    await loadPrizes();
+    await refreshAllData();
     alert('Приз удалён');
 }
 
@@ -550,16 +534,13 @@ function renderMain() {
     const totalEarned = myHistory.filter(h => h.delta > 0).reduce((s, h) => s + h.delta, 0);
     const level = getLevel(currentUser.rating);
     
-    const isLoadingEmployees = loadingStates.employees;
-    const isLoadingPrizes = loadingStates.prizes;
-    const isLoadingAchievements = loadingStates.achievements;
-    const isLoadingHistory = loadingStates.history;
-    
     const availablePrizes = prizes.filter(p => p.cost <= currentUser.points);
     const unavailablePrizes = prizes.filter(p => p.cost > currentUser.points);
     
     const allHistory = isManager ? history : [];
     const allAchievements = isManager ? achievements : [];
+    
+    const isLoading = !dataLoaded;
     
     const html = `
         <div style="max-width: 1200px; margin: 0 auto;">
@@ -604,7 +585,7 @@ function renderMain() {
             <div id="tab-main" class="tab ${activeTab === 'main' ? 'active' : ''}">
                 <div class="card">
                     <h3>👥 Команда</h3>
-                    ${isLoadingEmployees ? '<div class="loading"><span class="spinner"></span> Загрузка сотрудников...</div>' : 
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : 
                         activeEmployees.map(emp => {
                             const empLevel = getLevel(emp.rating);
                             return `
@@ -628,13 +609,13 @@ function renderMain() {
             <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
                 <div class="card">
                     <h3>🎁 Призы</h3>
-                    ${isLoadingPrizes ? '<div class="loading"><span class="spinner"></span> Загрузка призов...</div>' : 
+                    ${isLoading ? '<div class="loading">Загрузка...</div>' : 
                         !isManager ? `
                         <div class="prizes-section"><h4>✅ Доступные призы (${availablePrizes.length})</h4>
                         ${availablePrizes.map(p => `<div class="prize-item available-prize" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong> <span class="badge-available">✓ Доступен</span><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div><div>💰 ${p.cost} ОКОИНОВ</div></div>`).join('')}
                         </div>
                         <div class="prizes-section"><h4>🔒 Недоступные призы (${unavailablePrizes.length})</h4>
-                        ${unavailablePrizes.map(p => `<div class="prize-item" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div><div>💰 ${p.cost} ОКОИНО <span style="color:#dc2626;">(не хватает ${p.cost - currentUser.points})</span></div></div>`).join('')}
+                        ${unavailablePrizes.map(p => `<div class="prize-item" onclick="showPrizeInfo(${JSON.stringify(p).replace(/"/g, '&quot;')})"><div><strong>${p.name}</strong><br><span style="font-size:12px; color:#666;">${p.description ? p.description.substring(0, 50) : ''}</span></div><div>💰 ${p.cost} ОКОИНОВ <span style="color:#dc2626;">(не хватает ${p.cost - currentUser.points})</span></div></div>`).join('')}
                         </div>
                     ` : `
                         ${prizes.map(p => `
@@ -655,7 +636,7 @@ function renderMain() {
                 <div class="card">
                     <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn" onclick="addAchievement()">➕ Добавить</button></div>
                     <div id="achievementsListContainer">
-                        ${isLoadingAchievements ? '<div class="loading"><span class="spinner"></span> Загрузка достижений...</div>' : 
+                        ${isLoading ? '<div class="loading">Загрузка...</div>' : 
                             myAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : 
                             myAchievements.map(a => `
                                 <div class="achievement-item">
@@ -675,7 +656,7 @@ function renderMain() {
             <div id="tab-history" class="tab ${activeTab === 'history' ? 'active' : ''}">
                 <div class="card">
                     <h3>📜 Моя история операций</h3>
-                    ${isLoadingHistory ? '<div class="loading"><span class="spinner"></span> Загрузка истории...</div>' : 
+                    ${isLoading ? '<div class="loading">Загрузка истории...</div>' : 
                         myHistory.length === 0 ? '<div class="loading">Нет операций. Менеджер ещё не начислял вам баллы.</div>' : 
                         myHistory.map(h => `
                             <div class="history-item">
@@ -753,7 +734,7 @@ function renderMain() {
         btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
     
-    if (isManager && activeTab === 'dashboard' && !loadingStates.employees && !loadingStates.history && employees.length > 0) {
+    if (isManager && activeTab === 'dashboard' && !dataLoaded && employees.length > 0) {
         setTimeout(() => renderDashboard(), 50);
     }
 }
@@ -764,9 +745,7 @@ async function updateUserPoints(id, newPoints) {
         method: 'PATCH',
         body: JSON.stringify({ points: newPoints, rating: newPoints })
     });
-    loadingStates.employees = true;
-    renderMain();
-    await loadEmployees();
+    await refreshAllData();
     alert('Баланс обновлён');
 }
 
@@ -775,7 +754,7 @@ const saved = localStorage.getItem('user');
 if (saved) {
     try {
         currentUser = JSON.parse(saved);
-        loadingStates = { employees: true, prizes: true, achievements: true, history: true };
+        dataLoaded = false;
         renderMain();
         loadAllData();
     } catch(e) { renderLogin(); }
