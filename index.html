@@ -106,7 +106,7 @@ async function apiFetch(url, options = {}) {
     }
 }
 
-// ========== ЗАГРУЗКА ВСЕХ ДАННЫХ ==========
+// ========== ЗАГРУЗКА ДАННЫХ ==========
 async function refreshAllData() {
     if (!currentUser) return;
     
@@ -122,7 +122,6 @@ async function refreshAllData() {
     if (histData) history = histData;
     if (achData) achievements = achData;
     
-    // Обновляем текущего пользователя
     if (currentUser) {
         const updatedUser = employees.find(e => e.id === currentUser.id);
         if (updatedUser) {
@@ -179,7 +178,6 @@ async function addPoints(empId, delta) {
     const newPoints = emp.points + delta;
     const newRating = delta > 0 ? emp.rating + delta : emp.rating;
     
-    // Обновляем пользователя
     await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${empId}`, {
         method: 'PATCH',
         headers: {
@@ -190,7 +188,6 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ points: newPoints, rating: newRating })
     });
     
-    // Добавляем запись в историю
     await fetch(`${SUPABASE_URL}/rest/v1/history`, {
         method: 'POST',
         headers: {
@@ -201,7 +198,6 @@ async function addPoints(empId, delta) {
         body: JSON.stringify({ user_id: empId, reason, delta })
     });
     
-    // Обновляем локальные данные
     emp.points = newPoints;
     emp.rating = newRating;
     
@@ -211,18 +207,11 @@ async function addPoints(empId, delta) {
         localStorage.setItem('user', JSON.stringify(currentUser));
     }
     
-    // Перезагружаем историю и данные
     await refreshAllData();
-    
     alert(`${delta > 0 ? 'Начислено' : 'Списано'} ${Math.abs(delta)} ОКОИНОВ`);
 }
 
-// ========== ПРОСМОТР ПРИЗА (ДЛЯ ВСЕХ) ==========
-function showPrizeInfo(prize) {
-    alert(`🎁 ${prize.name}\n\n📖 ${prize.description || 'Нет описания'}\n💰 ${prize.cost} ОКОИНОВ\n\n📌 Условия: ${prize.conditions || 'Нет'}`);
-}
-
-// ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
+// ========== СОТРУДНИКИ ==========
 async function addEmployee() {
     const name = prompt('Имя');
     const surname = prompt('Фамилия');
@@ -268,11 +257,12 @@ async function resetUserPassword(userId) {
     alert(`Пароль сброшен на: ${newPassword}`);
 }
 
+// ========== ДОСТИЖЕНИЯ (ИСПРАВЛЕНЫ) ==========
 async function addAchievement() {
     const text = prompt('Текст достижения:');
     if (!text) return;
     
-    await fetch(`${SUPABASE_URL}/rest/v1/achievements`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements`, {
         method: 'POST',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -282,15 +272,21 @@ async function addAchievement() {
         body: JSON.stringify({ user_id: currentUser.id, text: text })
     });
     
-    await refreshAllData();
-    alert('✅ Достижение добавлено');
+    if (response.ok) {
+        const newAchievements = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
+        if (newAchievements) achievements = newAchievements;
+        refreshAchievementsList();
+        alert('✅ Достижение добавлено');
+    } else {
+        alert('❌ Ошибка добавления достижения');
+    }
 }
 
 async function editAchievement(id, oldText) {
     const newText = prompt('Редактировать достижение:', oldText);
     if (!newText || newText === oldText) return;
     
-    await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, {
         method: 'PATCH',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -300,14 +296,20 @@ async function editAchievement(id, oldText) {
         body: JSON.stringify({ text: newText })
     });
     
-    await refreshAllData();
-    alert('✅ Достижение обновлено');
+    if (response.ok) {
+        const newAchievements = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
+        if (newAchievements) achievements = newAchievements;
+        refreshAchievementsList();
+        alert('✅ Достижение обновлено');
+    } else {
+        alert('❌ Ошибка редактирования достижения');
+    }
 }
 
 async function deleteAchievement(id) {
     if (!confirm('Удалить достижение?')) return;
     
-    await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { 
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/achievements?id=eq.${id}`, { 
         method: 'DELETE',
         headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -315,10 +317,42 @@ async function deleteAchievement(id) {
         }
     });
     
-    await refreshAllData();
-    alert('✅ Достижение удалено');
+    if (response.ok || response.status === 204) {
+        const newAchievements = await apiFetch(`${SUPABASE_URL}/rest/v1/achievements?order=date.desc`);
+        if (newAchievements) achievements = newAchievements;
+        refreshAchievementsList();
+        alert('✅ Достижение удалено');
+    } else {
+        alert('❌ Ошибка удаления достижения');
+    }
 }
 
+function refreshAchievementsList() {
+    const container = document.getElementById('achievementsListContainer');
+    if (!container) return;
+    
+    const myAchievements = achievements.filter(a => a.user_id === currentUser.id);
+    
+    if (myAchievements.length === 0) {
+        container.innerHTML = '<p class="loading">Нет достижений. Добавьте первое!</p>';
+        return;
+    }
+    
+    container.innerHTML = myAchievements.map(a => `
+        <div class="achievement-item">
+            <div>
+                <span class="history-date">${new Date(a.date).toLocaleString()}</span><br>
+                ✨ ${escapeHtml(a.text)}
+            </div>
+            <div>
+                <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${escapeHtml(a.text).replace(/'/g, "\\'")}')">✏️</button>
+                <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ========== ПРИЗЫ ==========
 async function addPrize() {
     const name = prompt('Название приза');
     const cost = parseInt(prompt('Стоимость в ОКОИНАХ'));
@@ -359,6 +393,11 @@ async function deletePrize(id) {
     alert('Приз удалён');
 }
 
+function showPrizeInfo(prize) {
+    alert(`🎁 ${prize.name}\n\n📖 ${prize.description || 'Нет описания'}\n💰 ${prize.cost} ОКОИНОВ\n\n📌 Условия: ${prize.conditions || 'Нет'}`);
+}
+
+// ========== ПРОФИЛЬ ==========
 async function changePassword() {
     const oldPwd = prompt('Текущий пароль:');
     if (oldPwd !== currentUser.password) { alert('Неверный текущий пароль'); return; }
@@ -402,6 +441,7 @@ function showEmployeeProfile(empId) {
     window.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
 }
 
+// ========== ЭКСПОРТ В EXCEL ==========
 function exportToExcel() {
     const data = [['ID', 'Имя', 'Фамилия', 'Логин', 'Баланс', 'Рейтинг', 'Статус']];
     employees.forEach(e => data.push([e.id, e.name, e.surname || '', e.login, e.points, e.rating, e.status]));
@@ -444,6 +484,7 @@ function exportHistoryToExcel() {
     alert('Экспорт истории завершен');
 }
 
+// ========== ДАШБОРД ==========
 function renderDashboard() {
     const container = document.getElementById('dashboardContent');
     if (!container) return;
@@ -597,7 +638,7 @@ function renderMain() {
                 </div>
             </div>
             
-            <!-- Призы (с возможностью просмотра) -->
+            <!-- Призы -->
             <div id="tab-prizes" class="tab ${activeTab === 'prizes' ? 'active' : ''}">
                 <div class="card">
                     <h3>🎁 Призы</h3>
@@ -628,18 +669,7 @@ function renderMain() {
                 <div class="card">
                     <div class="flex"><h3>🌟 Мои достижения</h3><button class="btn" onclick="addAchievement()">➕ Добавить</button></div>
                     <div id="achievementsListContainer">
-                        ${isLoading ? '<div class="loading">Загрузка...</div>' : 
-                            myAchievements.length === 0 ? '<p class="loading">Нет достижений</p>' : 
-                            myAchievements.map(a => `
-                                <div class="achievement-item">
-                                    <div><span class="history-date">${new Date(a.date).toLocaleString()}</span><br>✨ ${escapeHtml(a.text)}</div>
-                                    <div>
-                                        <button class="btn btn-secondary btn-small" onclick="editAchievement(${a.id}, '${escapeHtml(a.text).replace(/'/g, "\\'")}')">✏️</button>
-                                        <button class="btn btn-danger btn-small" onclick="deleteAchievement(${a.id})">🗑️</button>
-                                    </div>
-                                </div>
-                            `).join('')
-                        }
+                        ${isLoading ? '<div class="loading">Загрузка...</div>' : ''}
                     </div>
                 </div>
             </div>
@@ -725,6 +755,11 @@ function renderMain() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
+    
+    // Заполняем список достижений после отрисовки
+    if (!isLoading && activeTab === 'achievements') {
+        refreshAchievementsList();
+    }
     
     if (isManager && activeTab === 'dashboard' && dataLoaded && employees.length > 0) {
         setTimeout(() => renderDashboard(), 50);
