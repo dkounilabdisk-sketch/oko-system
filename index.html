@@ -431,6 +431,8 @@ function showEmployeeProfile(empId) {
             <div>📊 Всего заработано: ${totalEarned} ОКОИНОВ</div>
             <div>🔑 Логин: ${emp.login}</div>
         </div>
+        <h3>🌟 Достижения</h3>
+        ${empAchievements.map(a => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><small>${new Date(a.date).toLocaleString()}</small><br>✨ ${a.text}</div>`).join('') || '<p>Нет достижений</p>'}
         <h3 style="margin-top:15px;">📜 История операций</h3>
         ${empHistory.map(h => `<div style="padding:8px 0; border-bottom:1px solid #eee;"><small>${new Date(h.date).toLocaleString()}</small><br>${h.reason}: ${h.delta > 0 ? '+' : ''}${h.delta}</div>`).join('') || '<p>Нет операций</p>'}
     `;
