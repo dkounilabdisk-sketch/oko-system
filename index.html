@@ -482,51 +482,113 @@ function exportHistoryToExcel() {
 }
 
 // ========== ДАШБОРД ==========
+// ========== ДАШБОРД (ГРАФИК ЗА 3 МЕСЯЦА + ВСЕ СОТРУДНИКИ) ==========
 function renderDashboard() {
     const container = document.getElementById('dashboardContent');
     if (!container) return;
+    
+    if (!dataLoaded || employees.length === 0) {
+        container.innerHTML = '<div class="loading">Загрузка данных...</div>';
+        return;
+    }
+    
     const activeEmps = employees.filter(e => e.status !== 'archived');
-    const totalPoints = activeEmps.reduce((s,e) => s + e.points, 0);
-    const totalRating = activeEmps.reduce((s,e) => s + e.rating, 0);
+    const totalPoints = activeEmps.reduce((s, e) => s + e.points, 0);
+    const totalRating = activeEmps.reduce((s, e) => s + e.rating, 0);
     const avgRating = activeEmps.length ? Math.round(totalRating / activeEmps.length) : 0;
-    const topEmployees = [...activeEmps].sort((a,b) => b.rating - a.rating).slice(0,5);
-    const last7Days = [];
+    
+    // Данные для графика за последние 3 месяца (90 дней)
+    const last90Days = [];
     const dailyTotals = {};
     const now = new Date();
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 89; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(now.getDate() - i);
-        const key = d.toISOString().slice(0,10);
-        last7Days.push(key.slice(5));
+        const key = d.toISOString().slice(0, 10);
+        last90Days.push(key.slice(5)); // формат: MM-DD
         dailyTotals[key] = 0;
     }
-    history.forEach(h => {
-        const date = h.date.slice(0,10);
-        if (dailyTotals[date] !== undefined && h.delta > 0) dailyTotals[date] += h.delta;
-    });
-    const chartData = last7Days.map(d => dailyTotals[d] || 0);
+    
+    // Считаем начисления по дням
+    if (history && history.length > 0) {
+        history.forEach(h => {
+            const date = h.date.slice(0, 10);
+            if (dailyTotals[date] !== undefined && h.delta > 0) {
+                dailyTotals[date] += h.delta;
+            }
+        });
+    }
+    
+    const chartData = last90Days.map(d => dailyTotals[d] || 0);
+    
+    // Сортируем сотрудников по рейтингу (по убыванию) для полного списка
+    const sortedEmployees = [...activeEmps].sort((a, b) => b.rating - a.rating);
+    
     container.innerHTML = `
         <div class="stats-grid">
             <div class="stat-card"><div>👥</div><div class="stat-number">${activeEmps.length}</div><div>Сотрудников</div></div>
-            <div class="stat-card"><div>💰</div><div class="stat-number">${totalPoints}</div><div>Всего ОКОИНОВ на балансе</div></div>
+            <div class="stat-card"><div>💰</div><div class="stat-number">${totalPoints}</div><div>Всего ОКОИНОВ</div></div>
             <div class="stat-card"><div>⭐</div><div class="stat-number">${totalRating}</div><div>Рейтинг</div></div>
             <div class="stat-card"><div>📊</div><div class="stat-number">${avgRating}</div><div>Средний рейтинг</div></div>
         </div>
-        <div class="chart-container"><canvas id="dashboardCanvas"></canvas></div>
-        <h4 style="margin-top:20px;">🏆 Топ-5 сотрудников по рейтингу</h4>
-        ${topEmployees.map((e,i) => `<div class="flex" style="padding:8px 0; border-bottom:1px solid #eee;"><span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`} ${e.name} ${e.surname || ''}</span><span class="level-badge ${getLevel(e.rating).class}">⭐ ${e.rating}</span><span>💰 ${e.points}</span></div>`).join('')}
+        <div class="chart-container">
+            <canvas id="dashboardCanvas"></canvas>
+        </div>
+        <h4 style="margin-top:20px;">🏆 Все сотрудники (по рейтингу)</h4>
+        ${sortedEmployees.map((e, i) => `
+            <div class="flex" style="padding:8px 0; border-bottom:1px solid #eee;">
+                <span>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} ${e.name} ${e.surname || ''}</span>
+                <span class="level-badge ${getLevel(e.rating).class}">⭐ ${e.rating}</span>
+                <span>💰 ${e.points} ОКОИНОВ</span>
+            </div>
+        `).join('')}
     `;
-    const ctx = document.getElementById('dashboardCanvas')?.getContext('2d');
-    if (ctx) {
+    
+    // Строим график с задержкой, чтобы DOM успел обновиться
+    setTimeout(() => {
+        const canvas = document.getElementById('dashboardCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
         if (dashboardChart) dashboardChart.destroy();
+        
+        // Показываем только каждый 5-й день на оси X, чтобы не было слишком много точек
+        const labels = last90Days.map((d, i) => i % 5 === 0 ? d : '');
+        
         dashboardChart = new Chart(ctx, {
             type: 'line',
-            data: { labels: last7Days, datasets: [{ label: 'Начислено ОКОИНОВ', data: chartData, borderColor: '#2d6a4f', backgroundColor: 'rgba(45,106,79,0.1)', tension: 0.3, fill: true }] },
-            options: { responsive: true, maintainAspectRatio: true }
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Начислено ОКОИНОВ',
+                    data: chartData,
+                    borderColor: '#2d6a4f',
+                    backgroundColor: 'rgba(45,106,79,0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { 
+                        position: 'top',
+                        labels: { font: { size: 14 } }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            maxTicksLimit: 20,
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
         });
-    }
+    }, 200);
 }
-
 async function updateUserPoints(id, newPoints) {
     if (isNaN(newPoints)) return;
     await apiFetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${id}`, {
